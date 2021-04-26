@@ -41,3 +41,5 @@ pip3 install prefect
 prefect backend server
 prefect server create-tenant --name default --slug default
 ```
+
+Accédez à l'interface via [localhost:8081](http://localhost:8081)

@@ -49,7 +49,7 @@ services:
             - prefect_postgres
     
     prefect_graphql:
-        image: "prefecthq/server:master"
+        image: "prefecthq/server:latest"
         ports:
             - "4201:4201"
         command: bash -c "${PREFECT_SERVER_DB_CMD} && python src/prefect_server/services/graphql/server.py"
@@ -71,7 +71,7 @@ services:
             - prefect_hasura
     
     prefect_towel:
-        image: "prefecthq/server:master"
+        image: "prefecthq/server:latest"
         command: "python src/prefect_server/services/towel/__main__.py"
         environment:
             PREFECT_SERVER__HASURA__ADMIN_SECRET: ${PREFECT_SERVER__HASURA__ADMIN_SECRET:-hasura-secret-admin-secret}
@@ -83,7 +83,7 @@ services:
             - prefect_graphql
     
     prefect_apollo:
-        image: "prefecthq/apollo:master"
+        image: "prefecthq/apollo:latest"
         command: bash -c "./post-start.sh && npm run serve"
         ports:
             - 4200:4200
@@ -107,12 +107,13 @@ services:
             - prefect_graphql
     
     prefect_ui:
-        image: "prefecthq/ui:2021-04-23"
+        image: "prefecthq/ui:2021-02-23"
         ports:
             - "8081:8080"
         command: "/intercept.sh"
         environment:
             PREFECT_SERVER__APOLLO_URL: http://localhost:4200/graphql
+            PREFECT_BACKEND: server
         networks:
             - prefect-server
         restart: "always"

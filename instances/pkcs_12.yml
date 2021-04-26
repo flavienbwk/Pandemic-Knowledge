@@ -1,0 +1,11 @@
+# For the moment, Enterprise Search only accepts PKCS#12 keystore
+# so we are forced to specifically create a certutil file for it.
+
+instances:
+
+    - name: enterprise_search
+      dns:
+        - enterprise_search
+        - localhost
+      ip:
+        - 127.0.0.1

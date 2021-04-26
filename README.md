@@ -48,4 +48,4 @@ prefect backend server
 prefect server create-tenant --name default --slug default
 ```
 
-Accédez à l'interface via [localhost:8081](http://localhost:8081)
+Access the web UI at [localhost:8081](http://localhost:8081)

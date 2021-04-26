@@ -88,10 +88,10 @@ services:
         ports:
             - 4200:4200
         environment:
-            HASURA_API_URL: ${HASURA_API_URL:-http://prefect_hasura:3000/v1alpha1/graphql}
-            PREFECT_API_URL: ${PREFECT_API_URL:-http://prefect_graphql:4201/graphql/}
-            PREFECT_API_HEALTH_URL: ${PREFECT_API_HEALTH_URL:-http://prefect_graphql:4201/health}
-            PREFECT_SERVER__TELEMETRY__ENABLED: ${PREFECT_SERVER__TELEMETRY__ENABLED:-false}
+            HASURA_API_URL: http://prefect_hasura:3000/v1alpha1/graphql
+            PREFECT_API_URL: http://prefect_graphql:4201/graphql/
+            PREFECT_API_HEALTH_URL: http://prefect_graphql:4201/health
+            PREFECT_SERVER__TELEMETRY__ENABLED: "false"
             GRAPHQL_SERVICE_HOST: http://prefect_graphql
             GRAPHQL_SERVICE_PORT: 4201
         networks:
@@ -112,7 +112,7 @@ services:
             - "8081:8080"
         command: "/intercept.sh"
         environment:
-            PREFECT_SERVER__APOLLO_URL: ${APOLLO_URL:-http://localhost:4200/graphql}
+            PREFECT_SERVER__APOLLO_URL: http://localhost:4200/graphql
         networks:
             - prefect-server
         restart: "always"

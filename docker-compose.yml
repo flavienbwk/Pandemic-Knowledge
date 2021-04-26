@@ -2,10 +2,8 @@ version: "3.7"
 
 services:
 
-    postgres:
+    prefect_postgres:
         image: "postgres:11"
-        ports:
-            - "${POSTGRES_HOST_PORT:-5432}:5432"
         environment:
             POSTGRES_USER: ${POSTGRES_USER}
             POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -15,16 +13,22 @@ services:
         networks:
             - prefect-server
         restart: "always"
+        healthcheck:
+            test: pg_isready -q -d $${POSTGRES_DB} -U $${POSTGRES_USER} || exit 1
+            interval: 10s
+            timeout: 2s
+            retries: 60
+            start_period: 2s
         command:
             - "postgres"
             # explicitly set max connections
             - "-c"
             - "max_connections=150"
         
-    hasura:
-        image: "hasura/graphql-engine:v1.3.0"
+    prefect_hasura:
+        image: "hasura/graphql-engine:v1.3.3"
         ports:
-            - "${HASURA_HOST_PORT:-3000}:3000"
+            - "3000:3000"
         command: "graphql-engine serve"
         environment:
             HASURA_GRAPHQL_DATABASE_URL: ${DB_CONNECTION_URL}
@@ -35,57 +39,75 @@ services:
         networks:
             - prefect-server
         restart: "always"
+        healthcheck:
+            test: wget -O - http://hasura:3000/healthz &>/dev/null || exit 1
+            interval: 10s
+            timeout: 2s
+            retries: 60
+            start_period: 1s
         depends_on:
-            - postgres
+            - prefect_postgres
     
-    graphql:
-        image: "prefecthq/server:${PREFECT_SERVER_TAG:-latest}"
+    prefect_graphql:
+        image: "prefecthq/server:master"
         ports:
-            - "${GRAPHQL_HOST_PORT:-4201}:4201"
+            - "4201:4201"
         command: bash -c "${PREFECT_SERVER_DB_CMD} && python src/prefect_server/services/graphql/server.py"
         environment:
             PREFECT_SERVER_DB_CMD: ${PREFECT_SERVER_DB_CMD:-"echo 'DATABASE MIGRATIONS SKIPPED'"}
             PREFECT_SERVER__DATABASE__CONNECTION_URL: ${DB_CONNECTION_URL}
             PREFECT_SERVER__HASURA__ADMIN_SECRET: ${PREFECT_SERVER__HASURA__ADMIN_SECRET:-hasura-secret-admin-secret}
-            PREFECT_SERVER__HASURA__HOST: hasura
+            PREFECT_SERVER__HASURA__HOST: prefect_hasura
         networks:
             - prefect-server
         restart: "always"
+        healthcheck:
+            test: curl --fail --silent "http://prefect_graphql:4201/health" &> /dev/null || exit 1
+            interval: 20s
+            timeout: 2s
+            retries: 60
+            start_period: 1s
         depends_on:
-            - hasura
+            - prefect_hasura
     
-    towel:
-        image: "prefecthq/server:${PREFECT_SERVER_TAG:-latest}"
+    prefect_towel:
+        image: "prefecthq/server:master"
         command: "python src/prefect_server/services/towel/__main__.py"
         environment:
             PREFECT_SERVER__HASURA__ADMIN_SECRET: ${PREFECT_SERVER__HASURA__ADMIN_SECRET:-hasura-secret-admin-secret}
-            PREFECT_SERVER__HASURA__HOST: hasura
+            PREFECT_SERVER__HASURA__HOST: prefect_hasura
         networks:
             - prefect-server
         restart: "always"
         depends_on:
-            - graphql
+            - prefect_graphql
     
-    apollo:
-        image: "prefecthq/apollo:${PREFECT_SERVER_TAG:-latest}"
-        ports:
-            - "${APOLLO_HOST_PORT:-4200}:4200"
+    prefect_apollo:
+        image: "prefecthq/apollo:master"
         command: bash -c "./post-start.sh && npm run serve"
+        ports:
+            - 4200:4200
         environment:
-            HASURA_API_URL: ${HASURA_API_URL:-http://hasura:3000/v1alpha1/graphql}
-            PREFECT_API_URL: ${PREFECT_API_URL:-http://graphql:4201/graphql/}
-            PREFECT_API_HEALTH_URL: ${PREFECT_API_HEALTH_URL:-http://graphql:4201/health}
+            HASURA_API_URL: ${HASURA_API_URL:-http://prefect_hasura:3000/v1alpha1/graphql}
+            PREFECT_API_URL: ${PREFECT_API_URL:-http://prefect_graphql:4201/graphql/}
+            PREFECT_API_HEALTH_URL: ${PREFECT_API_HEALTH_URL:-http://prefect_graphql:4201/health}
             PREFECT_SERVER__TELEMETRY__ENABLED: ${PREFECT_SERVER__TELEMETRY__ENABLED:-false}
-            GRAPHQL_SERVICE_HOST: http://graphql
-            GRAPHQL_SERVICE_PORT: ${GRAPHQL_HOST_PORT:-4201}
+            GRAPHQL_SERVICE_HOST: http://prefect_graphql
+            GRAPHQL_SERVICE_PORT: 4201
         networks:
             - prefect-server
         restart: "always"
+        healthcheck:
+            test: curl --fail --silent "http://prefect_apollo:4200/.well-known/apollo/server-health" &> /dev/null || exit 1
+            interval: 10s
+            timeout: 2s
+            retries: 60
+            start_period: 1s
         depends_on:
-            - graphql
+            - prefect_graphql
     
-    ui:
-        image: "prefecthq/ui:${PREFECT_UI_TAG:-latest}"
+    prefect_ui:
+        image: "prefecthq/ui:2021-04-23"
         ports:
             - "8081:8080"
         command: "/intercept.sh"
@@ -94,8 +116,13 @@ services:
         networks:
             - prefect-server
         restart: "always"
+        healthcheck:
+            test: curl --fail --silent --head "http://prefect_ui:8080/" &> /dev/null || exit 1
+            interval: 30s
+            timeout: 5s
+            retries: 3
         depends_on:
-            - apollo
+            - prefect_apollo
 
     es01:
         image: docker.elastic.co/elasticsearch/elasticsearch:7.12.0

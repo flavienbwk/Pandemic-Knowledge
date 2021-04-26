@@ -16,6 +16,24 @@ docker-compose up -d
 
 ### Initialize Prefect
 
+Create a `~/.prefect/config.toml` file with the following content :
+
+```bash
+# debug mode
+debug = true
+
+# base configuration directory (typically you won't change this!)
+home_dir = "~/.prefect"
+
+backend = "server"
+
+[server]
+host = "http://172.17.0.1"
+port = "4200"
+host_port = "4200"
+endpoint = "${server.host}:${server.port}"
+```
+
 We need to create a _tenant_. Execute on your host :
 
 ```bash

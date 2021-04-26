@@ -6,6 +6,14 @@ A fully-featured dashboard for extracting knowledge from Covid data.
 
 ### Initialize elasticsearch
 
+First, you will need to raise your host's ulimits for ElasticSearch to handle high I/O :
+
+```bash
+sudo sysctl -w vm.max_map_count=500000
+```
+
+Then :
+
 ```bash
 docker-compose -f create-certs.yml run --rm create_certs
 ```

@@ -11,7 +11,7 @@ docker-compose -f create-certs.yml run --rm create_certs
 ```
 
 ```bash
-docker-compose up -d
+docker-compose up -d es01 es02 es03 kibana
 ```
 
 ### Initialize Prefect
@@ -32,6 +32,12 @@ host = "http://172.17.0.1"
 port = "4200"
 host_port = "4200"
 endpoint = "${server.host}:${server.port}"
+```
+
+Run Prefect :
+
+```bash
+docker-compose up -d prefect_postgres prefect_hasura prefect_graphql prefect_towel prefect_apollo prefect_ui
 ```
 
 We need to create a _tenant_. Execute on your host :

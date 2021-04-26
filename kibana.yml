@@ -1,0 +1,19 @@
+server.name: kibana
+server.host: "0.0.0.0"
+elasticsearch.hosts: [ "https://es01:9200" ]
+telemetry.enabled: true
+
+xpack.monitoring.ui.container.elasticsearch.enabled: "true"
+elasticsearch.username: elastic
+elasticsearch.password: elastic
+
+# Encrypt traffic between the browser and Kibana
+server.ssl.enabled: "true"
+server.ssl.certificate: "/usr/share/elasticsearch/config/certificates/kibana/kibana.crt"
+server.ssl.key: "/usr/share/elasticsearch/config/certificates/kibana/kibana.key"
+
+# Encrypt traffic between Kibana and Elasticsearch
+elasticsearch.ssl.certificateAuthorities: ["/usr/share/elasticsearch/config/certificates/ca/ca.crt"]
+
+# Enterprise Search
+enterpriseSearch.host: 'https://enterprise_search:3002'

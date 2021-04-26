@@ -1,0 +1,27 @@
+version: '3.2'
+
+services:
+
+    create_certs:
+        container_name: create_certs
+        image: docker.elastic.co/elasticsearch/elasticsearch:7.10.0
+        command: >
+            bash -c '
+            if [[ ! -f /certs/ca.zip ]]; then
+                # Generating CA certificate
+                bin/elasticsearch-certutil ca --silent --pem -out /certs/ca.zip;
+                unzip /certs/ca.zip -d /certs;
+            fi;
+            if [[ ! -f /certs/pem.zip ]]; then
+                # Generating PEM certificates (ElasticSearch nodes and Kibana)
+                bin/elasticsearch-certutil cert --silent --pem --ca-cert "/certs/ca/ca.crt" --ca-key "/certs/ca/ca.key" --in config/certificates/pem.yml -out /certs/pem.zip;
+                unzip /certs/pem.zip -d /certs;
+            fi;
+            if [[ ! -f /certs/pkcs_12.zip ]]; then
+                # Generating PKCS#12 certificates (Enterprise Search)
+                bin/elasticsearch-certutil cert --silent --pass "changeme" --ca-cert "/certs/ca/ca.crt" --ca-key "/certs/ca/ca.key" --in config/certificates/pkcs_12.yml -out /certs/pkcs_12.zip;
+                unzip /certs/pkcs_12.zip -d /certs;
+            fi;
+            '
+        working_dir: /usr/share/elasticsearch
+        volumes: ['./certs:/certs', './instances:/usr/share/elasticsearch/config/certificates']

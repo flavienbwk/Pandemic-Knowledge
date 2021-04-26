@@ -1,0 +1,229 @@
+version: "3.7"
+
+services:
+
+    postgres:
+        image: "postgres:11"
+        ports:
+            - "${POSTGRES_HOST_PORT:-5432}:5432"
+        environment:
+            POSTGRES_USER: ${POSTGRES_USER}
+            POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+            POSTGRES_DB: ${POSTGRES_DB}
+        volumes:
+            - ${POSTGRES_DATA_PATH}:/var/lib/postgresql/data
+        networks:
+            - prefect-server
+        restart: "always"
+        command:
+            - "postgres"
+            # explicitly set max connections
+            - "-c"
+            - "max_connections=150"
+        
+    hasura:
+        image: "hasura/graphql-engine:v1.3.0"
+        ports:
+            - "${HASURA_HOST_PORT:-3000}:3000"
+        command: "graphql-engine serve"
+        environment:
+            HASURA_GRAPHQL_DATABASE_URL: ${DB_CONNECTION_URL}
+            HASURA_GRAPHQL_ENABLE_CONSOLE: "true"
+            HASURA_GRAPHQL_SERVER_PORT: "3000"
+            HASURA_GRAPHQL_QUERY_PLAN_CACHE_SIZE: 100
+            HASURA_GRAPHQL_LOG_LEVEL: "warn"
+        networks:
+            - prefect-server
+        restart: "always"
+        depends_on:
+            - postgres
+    
+    graphql:
+        image: "prefecthq/server:${PREFECT_SERVER_TAG:-latest}"
+        ports:
+            - "${GRAPHQL_HOST_PORT:-4201}:4201"
+        command: bash -c "${PREFECT_SERVER_DB_CMD} && python src/prefect_server/services/graphql/server.py"
+        environment:
+            PREFECT_SERVER_DB_CMD: ${PREFECT_SERVER_DB_CMD:-"echo 'DATABASE MIGRATIONS SKIPPED'"}
+            PREFECT_SERVER__DATABASE__CONNECTION_URL: ${DB_CONNECTION_URL}
+            PREFECT_SERVER__HASURA__ADMIN_SECRET: ${PREFECT_SERVER__HASURA__ADMIN_SECRET:-hasura-secret-admin-secret}
+            PREFECT_SERVER__HASURA__HOST: hasura
+        networks:
+            - prefect-server
+        restart: "always"
+        depends_on:
+            - hasura
+    
+    towel:
+        image: "prefecthq/server:${PREFECT_SERVER_TAG:-latest}"
+        command: "python src/prefect_server/services/towel/__main__.py"
+        environment:
+            PREFECT_SERVER__HASURA__ADMIN_SECRET: ${PREFECT_SERVER__HASURA__ADMIN_SECRET:-hasura-secret-admin-secret}
+            PREFECT_SERVER__HASURA__HOST: hasura
+        networks:
+            - prefect-server
+        restart: "always"
+        depends_on:
+            - graphql
+    
+    apollo:
+        image: "prefecthq/apollo:${PREFECT_SERVER_TAG:-latest}"
+        ports:
+            - "${APOLLO_HOST_PORT:-4200}:4200"
+        command: bash -c "./post-start.sh && npm run serve"
+        environment:
+            HASURA_API_URL: ${HASURA_API_URL:-http://hasura:3000/v1alpha1/graphql}
+            PREFECT_API_URL: ${PREFECT_API_URL:-http://graphql:4201/graphql/}
+            PREFECT_API_HEALTH_URL: ${PREFECT_API_HEALTH_URL:-http://graphql:4201/health}
+            PREFECT_SERVER__TELEMETRY__ENABLED: ${PREFECT_SERVER__TELEMETRY__ENABLED:-false}
+            GRAPHQL_SERVICE_HOST: http://graphql
+            GRAPHQL_SERVICE_PORT: ${GRAPHQL_HOST_PORT:-4201}
+        networks:
+            - prefect-server
+        restart: "always"
+        depends_on:
+            - graphql
+    
+    ui:
+        image: "prefecthq/ui:${PREFECT_UI_TAG:-latest}"
+        ports:
+            - "${UI_HOST_PORT:-8080}:8080"
+        command: "/intercept.sh"
+        environment:
+            PREFECT_SERVER__APOLLO_URL: ${APOLLO_URL:-http://localhost:4200/graphql}
+        networks:
+            - prefect-server
+        restart: "always"
+        depends_on:
+            - apollo
+
+es01:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.10.0
+    volumes:
+        - "es01:/usr/share/elasticsearch/data"
+        - "./certs:/usr/share/elasticsearch/config/certificates:ro"
+    ports:
+        - "9200:9200"
+    environment:
+        ES_JAVA_OPTS: "-Xmx512m -Xms512m"
+        ELASTIC_PASSWORD: ${ELASTICSEARCH_PWD}
+        node.name: es01
+        cluster.name: es-docker-cluster
+        discovery.seed_hosts: es02,es03
+        cluster.initial_master_nodes: es01,es02,es03
+        network.host: 0.0.0.0
+        xpack.license.self_generated.type: basic
+        xpack.monitoring.collection.enabled: "true"
+        xpack.security.enabled: "true"
+        xpack.security.http.ssl.enabled: "true"
+        xpack.security.http.ssl.key: /usr/share/elasticsearch/config/certificates/es01/es01.key
+        xpack.security.http.ssl.certificate_authorities: /usr/share/elasticsearch/config/certificates/ca/ca.crt
+        xpack.security.http.ssl.certificate: /usr/share/elasticsearch/config/certificates/es01/es01.crt
+        xpack.security.transport.ssl.enabled: "true"
+        xpack.security.transport.ssl.verification_mode: certificate 
+        xpack.security.transport.ssl.certificate_authorities: /usr/share/elasticsearch/config/certificates/ca/ca.crt
+        xpack.security.transport.ssl.certificate: /usr/share/elasticsearch/config/certificates/es01/es01.crt
+        xpack.security.transport.ssl.key: /usr/share/elasticsearch/config/certificates/es01/es01.key
+        cluster.routing.allocation.disk.threshold_enabled: "true"
+        cluster.routing.allocation.disk.watermark.low: 93%
+        cluster.routing.allocation.disk.watermark.high: 95%
+    depends_on:
+        - es02
+        - es03
+    ulimits: 
+        memlock:
+        soft: 262144
+        hard: 500000
+
+    es02:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.10.0
+    volumes:
+        - "es02:/usr/share/elasticsearch/data"
+        - "./certs:/usr/share/elasticsearch/config/certificates:ro"
+    environment:
+        ES_JAVA_OPTS: "-Xmx512m -Xms512m"
+        ELASTIC_PASSWORD: ${ELASTICSEARCH_PWD}
+        node.name: es02
+        cluster.name: es-docker-cluster
+        discovery.seed_hosts: es01,es03
+        cluster.initial_master_nodes: es01,es02,es03
+        xpack.license.self_generated.type: basic
+        xpack.monitoring.collection.enabled: "true"
+        xpack.security.enabled: "true"
+        xpack.security.http.ssl.enabled: "true"
+        xpack.security.http.ssl.key: /usr/share/elasticsearch/config/certificates/es02/es02.key
+        xpack.security.http.ssl.certificate_authorities: /usr/share/elasticsearch/config/certificates/ca/ca.crt
+        xpack.security.http.ssl.certificate: /usr/share/elasticsearch/config/certificates/es02/es02.crt
+        xpack.security.transport.ssl.enabled: "true"
+        xpack.security.transport.ssl.verification_mode: certificate 
+        xpack.security.transport.ssl.certificate_authorities: /usr/share/elasticsearch/config/certificates/ca/ca.crt
+        xpack.security.transport.ssl.certificate: /usr/share/elasticsearch/config/certificates/es02/es02.crt
+        xpack.security.transport.ssl.key: /usr/share/elasticsearch/config/certificates/es02/es02.key
+        cluster.routing.allocation.disk.threshold_enabled: "true"
+        cluster.routing.allocation.disk.watermark.low: 93%
+        cluster.routing.allocation.disk.watermark.high: 95%
+    ulimits: 
+        memlock:
+        soft: 262144
+        hard: 500000
+
+    es03:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.10.0
+    volumes:
+        - "es03:/usr/share/elasticsearch/data"
+        - "./certs:/usr/share/elasticsearch/config/certificates:ro"
+    environment:
+        ES_JAVA_OPTS: "-Xmx512m -Xms512m"
+        ELASTIC_PASSWORD: ${ELASTICSEARCH_PWD}
+        node.name: es03
+        cluster.name: es-docker-cluster
+        discovery.seed_hosts: es01,es02
+        cluster.initial_master_nodes: es01,es02,es03
+        xpack.license.self_generated.type: basic
+        xpack.monitoring.collection.enabled: "true"
+        xpack.security.enabled: "true"
+        xpack.security.http.ssl.enabled: "true"
+        xpack.security.http.ssl.key: /usr/share/elasticsearch/config/certificates/es03/es03.key
+        xpack.security.http.ssl.certificate_authorities: /usr/share/elasticsearch/config/certificates/ca/ca.crt
+        xpack.security.http.ssl.certificate: /usr/share/elasticsearch/config/certificates/es03/es03.crt
+        xpack.security.transport.ssl.enabled: "true"
+        xpack.security.transport.ssl.verification_mode: certificate 
+        xpack.security.transport.ssl.certificate_authorities: /usr/share/elasticsearch/config/certificates/ca/ca.crt
+        xpack.security.transport.ssl.certificate: /usr/share/elasticsearch/config/certificates/es03/es03.crt
+        xpack.security.transport.ssl.key: /usr/share/elasticsearch/config/certificates/es03/es03.key
+        cluster.routing.allocation.disk.threshold_enabled: "true"
+        cluster.routing.allocation.disk.watermark.low: 93%
+        cluster.routing.allocation.disk.watermark.high: 95%
+    ulimits: 
+        memlock:
+        soft: 262144
+        hard: 500000
+
+    kibana:
+    image: docker.elastic.co/kibana/kibana:7.10.0
+    volumes:
+        - type: bind
+        source: ./kibana.yml
+        target: /usr/share/kibana/config/kibana.yml
+        read_only: true
+        - "./certs:/usr/share/elasticsearch/config/certificates:ro"
+    ports:
+        - "5601:5601"
+    depends_on:
+        - es01
+
+    # source : https://docs.min.io/docs/deploy-minio-on-docker-compose.html
+    minio:
+        image: minio/minio:RELEASE.2020-10-09T22-55-05Z
+        command: server /data
+        ports:
+            - 9000:9000
+        volumes:
+            - /srv/docker/prefect/minio:/data
+        environment:
+            MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+            MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+
+networks:
+    prefect-server:
+        name: prefect-server

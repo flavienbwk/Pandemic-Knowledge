@@ -122,3 +122,13 @@ PUT /contamination_csse_*/_settings
     }
 }
 ```
+
+### Useful commands
+
+To stop everything :
+
+```bash
+docker-compose down
+docker-compose -f agent/docker-compose.yml down
+docker-compose -f insert.docker-compose.yml down
+```

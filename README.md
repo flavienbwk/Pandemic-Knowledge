@@ -57,3 +57,29 @@ prefect server create-tenant --name default --slug default
 ```
 
 Access the web UI at [localhost:8081](http://localhost:8081)
+
+### Run Prefect workers
+
+Agents are services that run your scheduled flows.
+
+Open and edit the [`agent/config.toml`](./agent/config.toml) file.
+
+> :information_source: In each `config.toml`, you will find the `172.17.0.1` IP address. This is the IP of the Docker daemon on which are exposed all exposed ports of your containers. This allows   containers on launched from different docker-compose networks to communicate. Change it if yours is different (check your daemon IP by typing `ip a | grep docker0`).
+> 
+> ![Docker interface IP](./docker_interface.png)
+> 
+> Here, mine is `192.168.254.1` but the default is generally to `172.17.0.1`.
+
+Then you can run :
+
+```bash
+docker-compose -f agent/docker-compose.yml up -d
+```
+
+> :information_source: You can run the agent on another machine than the one with the Prefect server. Edit the [`agent/config.toml`](./agent/config.toml) file for that.
+
+Maybe you want to instanciate multiple agents automatically ?
+
+```bash
+docker-compose -f agent/docker-compose.yml up -d --scale agent=3 agent
+```

@@ -145,6 +145,7 @@ def format_row(lookup_table, row, headers, filename):
             "date_end": date_end,
             "location": location[0],
             "cases": int(nb_cases) if nb_cases else 0,
+            "confirmed": int(nb_cases) if nb_cases else 0,
             "deaths": int(nb_deaths) if nb_deaths else 0,
             "recovered": int(nb_recovered) if nb_recovered else 0,
             "filename": filename,

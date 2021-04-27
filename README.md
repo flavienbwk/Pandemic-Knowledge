@@ -107,3 +107,18 @@ Download dependencies and start the injection service of your choice. For instan
 pip3 install -r ./flow/requirements.txt
 docker-compose -f insert.docker-compose.yml up --build insert_csse_contamination
 ```
+
+Once the flow registered, start it in the Prefect UI !
+
+On Kibana, create an index pattern `contamination_csse_*`
+
+Once executed, we recommend to adjust the number of replicas [in the DevTool](https://localhost:5601/app/dev_tools#/console) :
+
+```json
+PUT /contamination_csse_*/_settings
+{
+    "index" : {
+        "number_of_replicas" : "2"
+    }
+}
+```

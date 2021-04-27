@@ -11,6 +11,8 @@ from minio import Minio
 from minio.select import SelectRequest, CSVInputSerialization, CSVOutputSerialization
 from elasticsearch import Elasticsearch, helpers
 from ssl import create_default_context
+from geopy.geocoders import Nominatim
+from iso3166 import countries
 
 MINIO_SCHEME = os.environ.get("MINIO_SCHEME")
 MINIO_ENDPOINT = os.environ.get("MINIO_ENDPOINT")
@@ -27,7 +29,7 @@ elastic_headers = ["date_start", "date_end", "location", "cases"]
 
 columns_allowed = {
     "date": ["YearWeekISO", "dateRep", "date"],
-    "location": ["Region", "location", "countriesAndTerritories"],
+    "location": ["ReportingCountry", "location", "countriesAndTerritories"],
     "cases": ["NumberDosesReceived", "total_vaccinations", "cases"]
 }
 
@@ -45,17 +47,26 @@ mapping = {
                 "format": "strict_date_optional_time||epoch_millis"
             },
             "location": {
-                "type": "text"
+                "type": "geo_point"
             },
             "cases": {
                 "type": "long"
             },
             "filename": {
                 "type": "text"
+            },
+            "iso_code2": {
+                "type": "keywoard"
             }
         }
     }
 }
+
+extra_locations = {
+    "EL": "GR"
+}
+
+locations_cache = {}
 
 def get_es_instance():
     es_inst = Elasticsearch(
@@ -88,14 +99,33 @@ def format_date(date):
         return date, date
     return None, None
 
+def format_location(location_name):
+    if location_name in locations_cache:
+        return locations_cache[location_name]
+    geolocator = Nominatim(user_agent="pandemic-knowledge")
+    location = geolocator.geocode(extra_locations[location_name] if location_name in extra_locations else location_name, addressdetails=True)
+
+    if location is None:
+        logger.info(location_name)
+        return None
+
+    locations_cache[location_name] = ({
+        "lat": location.latitude,
+        "lon": location.longitude
+    }, location.raw['address']['country_code'].upper())
+
+    return locations_cache[location_name]
+
 def format_row(row, columns_indexes, filename):
     date_start, date_end = format_date(row[columns_indexes["date"]])
+    location = format_location(row[columns_indexes["location"]])
     formatted = {
         "date_start": date_start,
         "date_end": date_end,
-        "location": row[columns_indexes["location"]],
+        "location": location[0],
         "cases": int(row[columns_indexes["cases"]]) if row[columns_indexes["cases"]] != "" else 0,
-        "filename": filename
+        "filename": filename,
+        "iso_code2": location[1]
     }
     return formatted
 
@@ -120,7 +150,6 @@ def parse_file(minio_client, obj):
     csv_file_path = "/tmp/" + str(uuid.uuid4())
     minio_client.fget_object(obj.bucket_name, obj.object_name, csv_file_path)
     with open(csv_file_path, "r", newline="") as fp:
-        print(os.path.getsize(csv_file_path))
         char_read = 100000 if os.path.getsize(csv_file_path) > 100000 else None
 
         try:

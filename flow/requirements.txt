@@ -3,3 +3,5 @@ minio==7.0.3
 clevercsv==0.6.7
 tqdm==4.60.0
 elasticsearch==7.12.0
+geopy==2.1.0
+iso3166==1.0.1

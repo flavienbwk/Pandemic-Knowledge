@@ -1,0 +1,19 @@
+version: "3.7"
+
+services:
+
+  parse_insert:
+    build: ./flow
+    command: python3 /usr/app/parse_insert.py
+    volumes:
+      - "./flow/parse_insert.py:/usr/app/parse_insert.py:ro"
+      - type: bind
+        source: ./flow/config.toml
+        target: /root/.prefect/config.toml
+        read_only: true
+    env_file:
+      - .env
+    environment:
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}

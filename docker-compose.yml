@@ -155,6 +155,10 @@ services:
             cluster.routing.allocation.disk.threshold_enabled: "true"
             cluster.routing.allocation.disk.watermark.low: 93%
             cluster.routing.allocation.disk.watermark.high: 95%
+            http.cors.enabled : "true"  
+            http.cors.allow-origin : "*"
+            http.cors.allow-methods : OPTIONS, HEAD, GET, POST, PUT, DELETE
+            http.cors.allow-headers : Authorization,X-Requested-With,X-Auth-Token,Content-Type, Content-Length
         depends_on:
             - es02
             - es03

@@ -81,5 +81,29 @@ docker-compose -f agent/docker-compose.yml up -d
 Maybe you want to instanciate multiple agents automatically ?
 
 ```bash
-docker-compose -f agent/docker-compose.yml up -d --scale agent=3 agent
+docker-compose -f agent/docker-compose.yml up -d --build --scale agent=3 agent
+```
+
+### Inject COVID-19 data
+
+There are several data source supported by Pandemic Knowledge
+
+- CSSE at Johns Hopkins University [daily reports](https://github.com/CSSEGISandData/COVID-19/tree/master/csse_covid_19_data/csse_covid_19_daily_reports) (from 02/01/2020)
+  - docker-compose slug : `insert_csse_contamination`
+  - MinIO bucket : `contamination-csse`
+  - Format : CSV
+
+Start MinIO and import your files according to the buckets evoked upper :
+
+```bash
+docker-compose up -d minio
+```
+
+> MinIO is available at `localhost:9000`
+
+Download dependencies and start the injection service of your choice. For instance :
+
+```bash
+pip3 install -r ./flow/requirements.txt
+docker-compose -f insert.docker-compose.yml up --build insert_csse_contamination
 ```

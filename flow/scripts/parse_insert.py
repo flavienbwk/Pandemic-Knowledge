@@ -14,6 +14,8 @@ from ssl import create_default_context
 from geopy.geocoders import Nominatim
 from iso3166 import countries
 
+from mapping import mapping
+
 MINIO_SCHEME = os.environ.get("MINIO_SCHEME")
 MINIO_ENDPOINT = os.environ.get("MINIO_ENDPOINT")
 MINIO_ACCESS_KEY = os.environ.get("MINIO_ACCESS_KEY")
@@ -34,33 +36,6 @@ columns_allowed = {
 }
 
 logger = prefect.context.get("logger")
-
-mapping = {
-    "mappings": {
-        "properties": {
-            "date_start": {
-                "type": "date",
-                "format": "strict_date_optional_time||epoch_millis"
-            },
-            "date_end": {
-                "type": "date",
-                "format": "strict_date_optional_time||epoch_millis"
-            },
-            "location": {
-                "type": "geo_point"
-            },
-            "cases": {
-                "type": "long"
-            },
-            "filename": {
-                "type": "text"
-            },
-            "iso_code2": {
-                "type": "keywoard"
-            }
-        }
-    }
-}
 
 extra_locations = {
     "EL": "GR"

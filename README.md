@@ -1,12 +1,23 @@
 # Pandemic-Knowledge
 
-A fully-featured dashboard for extracting knowledge from Covid data.
+![Pandemic Knowledge logo](./pandemic_knowledge.png)
+
+A fully-featured dashboard and data pipeline for extracting knowledge from COVID-19-related data.
+
+- Contamination figures
+- Vaccination figures
+- Death figures
+- COVID-19-related news
 
 ## Install
 
+Below, you'll find the procedure to process COVID-related file and news into the Pandemic Knowledge database (elasticsearch).
+
+The process is **scheduled** to run every 24 hours so you can update the files and obtain the latest news
+
 ### Initialize elasticsearch
 
-First, you will need to raise your host's ulimits for ElasticSearch to handle high I/O :
+Raise your host's ulimits for ElasticSearch to handle high I/O :
 
 ```bash
 sudo sysctl -w vm.max_map_count=500000

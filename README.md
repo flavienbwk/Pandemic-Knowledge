@@ -35,37 +35,56 @@ docker-compose up -d es01 es02 es03 kibana enterprise_search
 
 ### Initialize Prefect
 
-Create a `~/.prefect/config.toml` file with the following content :
+Using localhost:
 
-```bash
-# debug mode
-debug = true
+    Create a `~/.prefect/config.toml` file with the following content :
 
-# base configuration directory (typically you won't change this!)
-home_dir = "~/.prefect"
+    ```bash
+    # debug mode
+    debug = true
 
-backend = "server"
+    # base configuration directory (typically you won't change this!)
+    home_dir = "~/.prefect"
 
-[server]
-host = "http://172.17.0.1"
-port = "4200"
-host_port = "4200"
-endpoint = "${server.host}:${server.port}"
-```
+    backend = "server"
 
-Run Prefect :
+    [server]
+    host = "http://172.17.0.1"
+    port = "4200"
+    host_port = "4200"
+    endpoint = "${server.host}:${server.port}"
+    ```
 
-```bash
-docker-compose up -d prefect_postgres prefect_hasura prefect_graphql prefect_towel prefect_apollo prefect_ui
-```
+    Run Prefect :
 
-We need to create a _tenant_. Execute on your host :
+    ```bash
+    docker-compose up -d prefect_postgres prefect_hasura prefect_graphql prefect_towel prefect_apollo prefect_ui
+    ```
 
-```bash
-pip3 install prefect
-prefect backend server
-prefect server create-tenant --name default --slug default
-```
+    We need to create a _tenant_. Execute on your host :
+
+    ```bash
+    pip3 install prefect
+    prefect backend server
+    prefect server create-tenant --name default --slug default
+    ```
+
+
+Or using docker:
+
+    Edit the file `prefect/prefect.config`
+
+    Run Prefect:
+
+    ```bash
+    docker-compose up -d prefect_postgres prefect_hasura prefect_graphql prefect_towel prefect_apollo prefect_ui
+    ```
+
+    We need to create a _tenant_. Execute on your host :
+
+    ```bash
+    docker-compose up -d prefect_setup
+    ```    
 
 Access the web UI at [localhost:8081](http://localhost:8081)
 
@@ -76,9 +95,9 @@ Agents are services that run your scheduled flows.
 Open and edit the [`agent/config.toml`](./agent/config.toml) file.
 
 > :information_source: In each `config.toml`, you will find the `172.17.0.1` IP address. This is the IP of the Docker daemon on which are exposed all exposed ports of your containers. This allows   containers on launched from different docker-compose networks to communicate. Change it if yours is different (check your daemon IP by typing `ip a | grep docker0`).
-> 
+>
 > ![Docker interface IP](./docker_interface.png)
-> 
+>
 > Here, mine is `192.168.254.1` but the default is generally to `172.17.0.1`.
 
 Then you can run :

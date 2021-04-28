@@ -26,6 +26,7 @@ ELASTIC_ENDPOINT = os.environ.get("ELASTIC_ENDPOINT")
 
 bucket_name = "contamination-owid"
 project_name = f"pandemic-knowledge-{bucket_name}"
+flow_name = project_name
 
 logger = prefect.context.get("logger")
 
@@ -42,7 +43,9 @@ columns_allowed = {
 
 extra_locations = {"EL": "GR"}
 
-locations_cache = {}
+locations_cache = {
+    "World": None
+}
 
 
 def get_es_instance():
@@ -213,19 +216,15 @@ def get_files(bucket_name):
 
 
 class ParseFiles(Task):
-    def __init__(self, lookup_table, index_name, **kwargs):
-        self.lookup_table = lookup_table
-        self.index_name = index_name
-        super().__init__(**kwargs)
 
-    def run(self):
-        logger.info(self.lookup_table)
+    def run(self, lookup_table, index_name):
+        logger.info(lookup_table)
         for file in tqdm(get_files(bucket_name=bucket_name)):
             object_name = file.object_name
             try:
                 logger.info(f"Processing file {object_name}...")
                 process_file(
-                    self.lookup_table, self.index_name, bucket_name, object_name
+                    lookup_table, index_name, bucket_name, object_name
                 )
             except Exception as e:
                 logger.error(traceback.format_exc())
@@ -234,12 +233,12 @@ class ParseFiles(Task):
 
 
 class GenerateEsMapping(Task):
-    def __init__(self, index_name, **kwargs):
-        self.index_name = index_name
-        super().__init__(**kwargs)
-
-    def run(self):
-        index_name = self.index_name
+    def run(self) -> str:
+        """
+        Returns:
+            str: index_name
+        """
+        index_name = f"{bucket_name.replace('-', '_')}"
         es_inst = get_es_instance()
         logger.info("Generating mapping for index {}".format(index_name))
         es_inst.indices.delete(index=index_name, ignore=[400, 404])
@@ -255,9 +254,9 @@ class GenerateEsMapping(Task):
                 logger.error(response["error"]["root_cause"])
                 logger.error("Error type: {}".format(response["error"]["type"]))
                 raise Exception("Unable to create index mapping")
+        return index_name
 
 
-@task
 def read_lookup_table(lookup_file_path: str):
     logger.info("Loading lookup table...")
     lookup = {}
@@ -284,14 +283,14 @@ def read_lookup_table(lookup_file_path: str):
 
 
 if __name__ == "__main__":
-    with Flow("Parse and insert CSV files") as flow:
-        lookup_table = read_lookup_table("/usr/app/UID_ISO_FIPS_LookUp_Table.csv")
-        index_name = f"{bucket_name.replace('-', '_')}"
-        logger.info(f"Process for index {index_name}...")
-        flow.set_dependencies(
-            upstream_tasks=[GenerateEsMapping(index_name)],
-            task=[ParseFiles(lookup_table=lookup_table, index_name=index_name)],
-        )
+    lookup_table = read_lookup_table("/usr/app/UID_ISO_FIPS_LookUp_Table.csv")
+
+    with Flow(flow_name) as flow:
+        es_mapping_task = GenerateEsMapping()
+        index_name = es_mapping_task()
+
+        parse_files_task = ParseFiles()
+        parse_files_task(lookup_table=lookup_table, index_name=index_name)
 
     try:
         client = Client()

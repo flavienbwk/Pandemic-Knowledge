@@ -244,6 +244,29 @@ services:
         depends_on:
             - es01
 
+    enterprise_search:
+        image: docker.elastic.co/enterprise-search/enterprise-search:7.12.0
+        environment:
+            JAVA_OPTS: "-Xms512m -Xmx512m"
+            ENT_SEARCH_DEFAULT_PASSWORD: elasticelastic
+            ent_search.external_url: "https://localhost:3002"
+            ent_search.auth.source: elasticsearch-native # elasticsearch-based users
+            ent_search.ssl.enabled: "true"
+            ent_search.ssl.keystore.path: "/usr/share/elasticsearch/config/certificates/enterprise_search/enterprise_search.p12"
+            ent_search.ssl.keystore.password: changeme
+            elasticsearch.username: elastic
+            elasticsearch.password: ${ELASTICSEARCH_PWD}
+            elasticsearch.host: "https://es01:9200"
+            elasticsearch.ssl.enabled: "true"
+            elasticsearch.ssl.certificate_authority: "/usr/share/elasticsearch/config/certificates/ca/ca.crt"
+            allow_es_settings_modification: "true"
+            secret_management.encryption_keys: "[elasticelastic]"
+            telemetry.enabled: "false"
+        volumes:
+            - "./certs:/usr/share/elasticsearch/config/certificates:ro"
+        ports:
+            - "3002:3002"
+
     # source : https://docs.min.io/docs/deploy-minio-on-docker-compose.html
     minio:
         image: minio/minio:RELEASE.2021-04-06T23-11-00Z-24-g409125240

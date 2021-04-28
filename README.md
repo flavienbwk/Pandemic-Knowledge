@@ -19,7 +19,7 @@ docker-compose -f create-certs.yml run --rm create_certs
 ```
 
 ```bash
-docker-compose up -d es01 es02 es03 kibana
+docker-compose up -d es01 es02 es03 kibana enterprise_search
 ```
 
 ### Initialize Prefect
@@ -88,10 +88,6 @@ docker-compose -f agent/docker-compose.yml up -d --build --scale agent=3 agent
 
 There are several data source supported by Pandemic Knowledge
 
-- CSSE at Johns Hopkins University [daily reports](https://github.com/CSSEGISandData/COVID-19/tree/master/csse_covid_19_data/csse_covid_19_daily_reports) (from 02/01/2020)
-  - docker-compose slug : `insert_csse`
-  - MinIO bucket : `contamination-csse`
-  - Format : CSV
 - [Our World In Data](https://ourworldindata.org/coronavirus-data); used by Google
   - docker-compose slug : `insert_owid`
   - MinIO bucket : `contamination-owid`
@@ -140,7 +136,7 @@ docker-compose -f insert.docker-compose.yml down
 To start each service, step by step :
 
 ```bash
-docker-compose up -d es01 es02 es03 kibana
+docker-compose up -d es01 es02 es03 kibana enterprise_search
 docker-compose up -d minio
 docker-compose up -d prefect_postgres prefect_hasura prefect_graphql prefect_towel prefect_apollo prefect_ui
 docker-compose -f agent/docker-compose.yml up -d --build --scale agent=3 agent

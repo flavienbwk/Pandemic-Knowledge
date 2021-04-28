@@ -2,9 +2,9 @@ version: "3.7"
 
 services:
 
-  insert_owid:
+  insert_france:
     build: ./flow
-    command: python3 /usr/app/insert_owid.py
+    command: python3 /usr/app/insert_france.py
     volumes:
       - /srv/docker/prefect/flows:/root/.prefect/flows
       - "./flow/scripts:/usr/app:ro"
@@ -26,9 +26,9 @@ services:
       ELASTIC_USER: ${ELASTIC_USER}
       ELASTIC_PWD: ${ELASTICSEARCH_PWD}
 
-  insert_csse_contamination:
+  insert_owid:
     build: ./flow
-    command: python3 /usr/app/insert_csse_contamination.py
+    command: python3 /usr/app/insert_owid.py
     volumes:
       - /srv/docker/prefect/flows:/root/.prefect/flows
       - "./flow/scripts:/usr/app:ro"

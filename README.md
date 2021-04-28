@@ -92,6 +92,9 @@ There are several data source supported by Pandemic Knowledge
   - docker-compose slug : `insert_owid`
   - MinIO bucket : `contamination-owid`
   - Format : CSV
+- [OpenCovid19-Fr](https://github.com/opencovid19-fr/data)
+  - docker-compose slug : `insert_france`
+  - Format : CSV
 
 Start MinIO and import your files according to the buckets evoked upper :
 

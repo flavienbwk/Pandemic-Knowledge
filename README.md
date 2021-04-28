@@ -92,6 +92,7 @@ There are several data source supported by Pandemic Knowledge
   - docker-compose slug : `insert_csse_contamination`
   - MinIO bucket : `contamination-csse`
   - Format : CSV
+- [Our World In Data](https://ourworldindata.org/coronavirus-data); used by Google
 
 Start MinIO and import your files according to the buckets evoked upper :
 
@@ -131,4 +132,13 @@ To stop everything :
 docker-compose down
 docker-compose -f agent/docker-compose.yml down
 docker-compose -f insert.docker-compose.yml down
+```
+
+To start each service, step by step :
+
+```bash
+docker-compose up -d es01 es02 es03 kibana
+docker-compose up -d minio
+docker-compose up -d prefect_postgres prefect_hasura prefect_graphql prefect_towel prefect_apollo prefect_ui
+docker-compose -f agent/docker-compose.yml up -d --build --scale agent=3 agent
 ```

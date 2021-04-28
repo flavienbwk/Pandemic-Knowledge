@@ -1,17 +1,15 @@
 import os
-import re
-import csv
+import dateparser
 import uuid
 import prefect
 import clevercsv
 import traceback
 from tqdm import tqdm
-from datetime import datetime, timedelta, date
+from datetime import datetime, date
 from prefect import Flow, Task, Client
 from minio import Minio
 from elasticsearch import Elasticsearch, helpers
 from geopy.geocoders import Nominatim
-from iso3166 import countries
 
 from mapping import mapping
 
@@ -62,27 +60,11 @@ def get_es_instance():
 def format_date(date):
     if not date:
         return None
-    date = date.replace("/", "-")
-    p = re.compile("(\\d{4})-W(\\d{2})")
-    weekMatches = p.match(date)
-    if weekMatches is not None:
-        groups = weekMatches.groups()
-        date_start = datetime.strptime(
-            f"{groups[0]}-W{int(groups[1]) - 1}-1", "%Y-W%W-%w"
-        ).date()
-        date_end = date_start + timedelta(days=6.9)
-        return date_start.strftime("%Y-%m-%d"), date_end.strftime("%Y-%m-%d")
-    p = re.compile("(\\d{2})-(\\d{2})-(\\d{4})")
-    frDateMatches = p.match(date)
-    if frDateMatches is not None:
-        groups = frDateMatches.groups()
-        date = f"{groups[2]}-{groups[1]}-{groups[0]}"
-        return date, date
-    p = re.compile("(\\d{4})-(\\d{2})-(\\d{2})")
-    dateMatches = p.match(date)
-    if dateMatches is not None:
-        return date, date
-    return None, None
+    try:
+        return dateparser.parse(date)
+    except Exception as e:
+        logger.error(e)
+    return None
 
 
 def format_location(lookup_table, location_name):
@@ -103,16 +85,15 @@ def format_location(lookup_table, location_name):
     )
     logger.info(f"Found {location.latitude}, {location.longitude}")
 
-    if location is None:
-        logger.info(location_name)
+    if location and location.raw and "address" in location.raw:
+        locations_cache[location_name] = (
+            {"lat": location.latitude, "lon": location.longitude},
+            location.raw["address"]["country_code"].upper(),
+        )
+        return locations_cache[location_name]
+    else:
+        logger.error(f"Failed to locate {location}")
         return None
-
-    locations_cache[location_name] = (
-        {"lat": location.latitude, "lon": location.longitude},
-        location.raw["address"]["country_code"].upper(),
-    )
-
-    return locations_cache[location_name]
 
 
 def pick_one_of_elements(haystack: list, needles: list):
@@ -130,8 +111,8 @@ def pick_nonempty_cell(row, headers, potential_keys):
 
 
 def format_row(lookup_table, row, headers, filename):
-    date_start = date_end = datetime.strptime(
-        pick_nonempty_cell(row, headers, columns_allowed["date"]), "%Y-%m-%d %H:%M:%S"
+    date_start = date_end = format_date(
+        pick_nonempty_cell(row, headers, columns_allowed["date"])
     )
     location = format_location(
         lookup_table, pick_nonempty_cell(row, headers, columns_allowed["location"])
@@ -289,7 +270,9 @@ if __name__ == "__main__":
         for file in tqdm(get_files(bucket_name=bucket_name)):
             object_name = file.object_name
             try:
-                file_date = datetime.strptime(object_name[:-4], "%m-%d-%Y")
+                file_date = format_date(object_name[:-4])
+                if not file_date:
+                    raise ValueError(f"main: No date found for file {object_name}")
                 index_name = f"{bucket_name.replace('-', '_')}_{date.strftime(file_date, '%Y')}_{date.strftime(file_date, '%m')}_{date.strftime(file_date, '%d')}"
                 logger.info(f"Process for index {index_name}...")
                 flow.set_dependencies(

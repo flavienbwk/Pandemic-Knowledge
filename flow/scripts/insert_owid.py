@@ -1,6 +1,7 @@
 import os
 import dateparser
 import uuid
+import json
 import prefect
 import clevercsv
 import traceback
@@ -24,26 +25,27 @@ ELASTIC_USER = os.environ.get("ELASTIC_USER")
 ELASTIC_PWD = os.environ.get("ELASTIC_PWD")
 ELASTIC_ENDPOINT = os.environ.get("ELASTIC_ENDPOINT")
 
-bucket_name = "contamination-csse"
+bucket_name = "contamination-owid"
+project_name = f"pandemic-knowledge-{bucket_name}"
 
 logger = prefect.context.get("logger")
 
 columns_allowed = {
-    "date": ["Last Update", "Last_Update"],
-    "location": [
-        "Country_Region",
-        "Country/Region",
-        "Province_State",
-        "Province/State",
-    ],
-    "cases": ["Confirmed"],
-    "deaths": ["Deaths"],
-    "recovered": ["Recovered"],
+    "date": ["date"],
+    "location": ["location"],
+    "location_name": ["location"],
+    "cases": ["new_cases"],
+    "deaths": ["new_deaths"],
+    "recovered": [],
+    "vaccinated": ["new_vaccinations"],
+    "tested": ["new_tests"],
 }
 
 extra_locations = {"EL": "GR"}
 
-locations_cache = {}
+locations_cache = {
+    
+}
 
 
 def get_es_instance():
@@ -83,17 +85,18 @@ def format_location(lookup_table, location_name):
         else location_name,
         addressdetails=True,
     )
-    logger.info(f"Found {location.latitude}, {location.longitude}")
 
-    if location and location.raw and "address" in location.raw:
-        locations_cache[location_name] = (
-            {"lat": location.latitude, "lon": location.longitude},
-            location.raw["address"]["country_code"].upper(),
-        )
-        return locations_cache[location_name]
-    else:
-        logger.error(f"Failed to locate {location}")
-        return None
+    if location and location.raw:
+        logger.info(f"Found {location.latitude}, {location.longitude}")
+        if "address" in location.raw:
+            locations_cache[location_name] = (
+                {"lat": location.latitude, "lon": location.longitude},
+                location.raw["address"]["country_code"].upper() if "country_code" in location.raw["address"] else None,
+            )
+            return locations_cache[location_name]
+        locations_cache[location_name] = None
+    logger.error(f"Failed to locate {location}")
+    return None
 
 
 def pick_one_of_elements(haystack: list, needles: list):
@@ -117,20 +120,26 @@ def format_row(lookup_table, row, headers, filename):
     location = format_location(
         lookup_table, pick_nonempty_cell(row, headers, columns_allowed["location"])
     )
+    location_name = pick_nonempty_cell(row, headers, columns_allowed["location_name"])
     nb_cases = pick_nonempty_cell(row, headers, columns_allowed["cases"])
     nb_deaths = pick_nonempty_cell(row, headers, columns_allowed["deaths"])
     nb_recovered = pick_nonempty_cell(row, headers, columns_allowed["recovered"])
+    nb_vaccinated = pick_nonempty_cell(row, headers, columns_allowed["vaccinated"])
+    nb_tested = pick_nonempty_cell(row, headers, columns_allowed["tested"])
     if location and date_start and nb_cases:
         return {
             "date_start": date_start,
             "date_end": date_end,
             "location": location[0],
-            "cases": int(nb_cases) if nb_cases else 0,
-            "confirmed": int(nb_cases) if nb_cases else 0,
-            "deaths": int(nb_deaths) if nb_deaths else 0,
-            "recovered": int(nb_recovered) if nb_recovered else 0,
+            "location_name": location_name,
+            "cases": int(float(nb_cases)) if nb_cases else 0,
+            "confirmed": int(float(nb_cases)) if nb_cases else 0,
+            "deaths": int(float(nb_deaths)) if nb_deaths else 0,
+            "recovered": int(float(nb_recovered)) if nb_recovered else 0,
+            "vaccinated": int(float(nb_vaccinated)) if nb_vaccinated else 0,
+            "tested": int(float(nb_tested)) if nb_tested else 0,
             "filename": filename,
-            "iso_code2": location[1],
+            "iso_code2": location[1] if len(location) else None,
         }
     return None
 
@@ -186,7 +195,7 @@ class ParseFile(Task):
                     inject_rows_to_es(to_inject, index_name)
                     to_inject = []
             else:
-                logger.info("Invalid row : ", row)
+                logger.info("Invalid row")
         if len(to_inject) > 0:
             inject_rows_to_es(to_inject, index_name)
 
@@ -270,10 +279,7 @@ if __name__ == "__main__":
         for file in tqdm(get_files(bucket_name=bucket_name)):
             object_name = file.object_name
             try:
-                file_date = format_date(object_name[:-4])
-                if not file_date:
-                    raise ValueError(f"main: No date found for file {object_name}")
-                index_name = f"{bucket_name.replace('-', '_')}_{date.strftime(file_date, '%Y')}_{date.strftime(file_date, '%m')}_{date.strftime(file_date, '%d')}"
+                index_name = f"{bucket_name.replace('-', '_')}"
                 logger.info(f"Process for index {index_name}...")
                 flow.set_dependencies(
                     upstream_tasks=[GenerateEsMapping(index_name)],
@@ -292,10 +298,11 @@ if __name__ == "__main__":
 
     try:
         client = Client()
-        client.create_project(project_name="pandemic-knowledge-csse-contamination")
+        client.create_project(project_name=project_name)
     except prefect.utilities.exceptions.ClientError as e:
         logger.info("Project already exists")
 
     flow.register(
-        project_name="pandemic-knowledge-csse-contamination", labels=["development"]
+        project_name=project_name, labels=["development"]
     )
+    flow.run()

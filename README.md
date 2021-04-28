@@ -89,10 +89,13 @@ docker-compose -f agent/docker-compose.yml up -d --build --scale agent=3 agent
 There are several data source supported by Pandemic Knowledge
 
 - CSSE at Johns Hopkins University [daily reports](https://github.com/CSSEGISandData/COVID-19/tree/master/csse_covid_19_data/csse_covid_19_daily_reports) (from 02/01/2020)
-  - docker-compose slug : `insert_csse_contamination`
+  - docker-compose slug : `insert_csse`
   - MinIO bucket : `contamination-csse`
   - Format : CSV
 - [Our World In Data](https://ourworldindata.org/coronavirus-data); used by Google
+  - docker-compose slug : `insert_owid`
+  - MinIO bucket : `contamination-owid`
+  - Format : CSV
 
 Start MinIO and import your files according to the buckets evoked upper :
 
@@ -106,7 +109,7 @@ Download dependencies and start the injection service of your choice. For instan
 
 ```bash
 pip3 install -r ./flow/requirements.txt
-docker-compose -f insert.docker-compose.yml up --build insert_csse_contamination
+docker-compose -f insert.docker-compose.yml up --build insert_csse
 ```
 
 Once the flow registered, start it in the Prefect UI !

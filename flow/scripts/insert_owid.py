@@ -6,8 +6,7 @@ import prefect
 import clevercsv
 import traceback
 from tqdm import tqdm
-from datetime import datetime, date
-from prefect import Flow, Task, Client
+from prefect import Flow, Task, Client, task
 from minio import Minio
 from elasticsearch import Elasticsearch, helpers
 from geopy.geocoders import Nominatim
@@ -43,9 +42,7 @@ columns_allowed = {
 
 extra_locations = {"EL": "GR"}
 
-locations_cache = {
-    
-}
+locations_cache = {}
 
 
 def get_es_instance():
@@ -88,14 +85,16 @@ def format_location(lookup_table, location_name):
 
     if location and location.raw:
         logger.info(f"Found {location.latitude}, {location.longitude}")
-        if "address" in location.raw:
+        if "address" in location.raw and "country_code" in location.raw["address"]:
             locations_cache[location_name] = (
                 {"lat": location.latitude, "lon": location.longitude},
-                location.raw["address"]["country_code"].upper() if "country_code" in location.raw["address"] else None,
+                location.raw["address"]["country_code"].upper(),
             )
             return locations_cache[location_name]
-        locations_cache[location_name] = None
-    logger.error(f"Failed to locate {location}")
+    locations_cache[location_name] = None
+    logger.error(
+        f"Failed to locate (no country code and/or coordinates) for {location}"
+    )
     return None
 
 
@@ -178,26 +177,25 @@ def parse_file(lookup_table, minio_client, bucket_name, object_name):
     return []
 
 
-class ParseFile(Task):
-    def run(self, lookup_table, index_name, bucket_name, object_name):
-        minio_client = Minio(
-            MINIO_ENDPOINT,
-            access_key=MINIO_ACCESS_KEY,
-            secret_key=MINIO_SECRET_KEY,
-            secure=MINIO_SCHEME == "https",
-        )
-        to_inject = []
-        logger.info(f"Processing {object_name}...")
-        for row in parse_file(lookup_table, minio_client, bucket_name, object_name):
-            if row is not None:
-                to_inject.append(row)
-                if len(to_inject) >= MAX_ES_ROW_INJECT:
-                    inject_rows_to_es(to_inject, index_name)
-                    to_inject = []
-            else:
-                logger.info("Invalid row")
-        if len(to_inject) > 0:
-            inject_rows_to_es(to_inject, index_name)
+def process_file(lookup_table, index_name, bucket_name, object_name):
+    minio_client = Minio(
+        MINIO_ENDPOINT,
+        access_key=MINIO_ACCESS_KEY,
+        secret_key=MINIO_SECRET_KEY,
+        secure=MINIO_SCHEME == "https",
+    )
+    to_inject = []
+    logger.info(f"Processing {object_name}...")
+    for row in parse_file(lookup_table, minio_client, bucket_name, object_name):
+        if row is not None:
+            to_inject.append(row)
+            if len(to_inject) >= MAX_ES_ROW_INJECT:
+                inject_rows_to_es(to_inject, index_name)
+                to_inject = []
+        else:
+            logger.info("Invalid row")
+    if len(to_inject) > 0:
+        inject_rows_to_es(to_inject, index_name)
 
 
 def get_files(bucket_name):
@@ -214,6 +212,27 @@ def get_files(bucket_name):
     return list(minio_client.list_objects(bucket_name))
 
 
+class ParseFiles(Task):
+    def __init__(self, lookup_table, index_name, **kwargs):
+        self.lookup_table = lookup_table
+        self.index_name = index_name
+        super().__init__(**kwargs)
+
+    def run(self):
+        logger.info(self.lookup_table)
+        for file in tqdm(get_files(bucket_name=bucket_name)):
+            object_name = file.object_name
+            try:
+                logger.info(f"Processing file {object_name}...")
+                process_file(
+                    self.lookup_table, self.index_name, bucket_name, object_name
+                )
+            except Exception as e:
+                logger.error(traceback.format_exc())
+                logger.error(e)
+                logger.error(f"Can't process file {object_name}")
+
+
 class GenerateEsMapping(Task):
     def __init__(self, index_name, **kwargs):
         self.index_name = index_name
@@ -222,15 +241,11 @@ class GenerateEsMapping(Task):
     def run(self):
         index_name = self.index_name
         es_inst = get_es_instance()
-
         logger.info("Generating mapping for index {}".format(index_name))
-
         es_inst.indices.delete(index=index_name, ignore=[400, 404])
-
         response = es_inst.indices.create(
             index=index_name, body=mapping, ignore=400  # ignore 400 already exists code
         )
-
         if "acknowledged" in response:
             if response["acknowledged"] == True:
                 logger.info(
@@ -242,17 +257,13 @@ class GenerateEsMapping(Task):
                 raise Exception("Unable to create index mapping")
 
 
+@task
 def read_lookup_table(lookup_file_path: str):
+    logger.info("Loading lookup table...")
     lookup = {}
     with open(lookup_file_path, "r", newline="") as fp:
         char_read = 10000 if os.path.getsize(lookup_file_path) > 10000 else None
-
-        try:
-            dialect = clevercsv.Sniffer().sniff(fp.read(char_read), verbose=True)
-        except Exception as e:
-            logger.error(e)
-            return {}
-
+        dialect = clevercsv.Sniffer().sniff(fp.read(char_read), verbose=True)
         fp.seek(0)
         reader = clevercsv.reader(fp, dialect)
         next(reader)
@@ -268,33 +279,19 @@ def read_lookup_table(lookup_file_path: str):
                             {"lat": float(row[8]), "lon": float(row[9])},
                             row[1],
                         )
+    logger.info(f"Found {len(lookup)} locations.")
     return lookup
 
 
 if __name__ == "__main__":
     with Flow("Parse and insert CSV files") as flow:
-        logger.info("Loading lookup table...")
         lookup_table = read_lookup_table("/usr/app/UID_ISO_FIPS_LookUp_Table.csv")
-        logger.info(f"Found {len(lookup_table)} locations.")
-        for file in tqdm(get_files(bucket_name=bucket_name)):
-            object_name = file.object_name
-            try:
-                index_name = f"{bucket_name.replace('-', '_')}"
-                logger.info(f"Process for index {index_name}...")
-                flow.set_dependencies(
-                    upstream_tasks=[GenerateEsMapping(index_name)],
-                    task=ParseFile(),
-                    keyword_tasks=dict(
-                        lookup_table=lookup_table,
-                        index_name=index_name,
-                        bucket_name=bucket_name,
-                        object_name=object_name,
-                    ),
-                )
-            except Exception as e:
-                logger.error(traceback.format_exc())
-                logger.error(e)
-                logger.error(f"Can't process object {object_name}")
+        index_name = f"{bucket_name.replace('-', '_')}"
+        logger.info(f"Process for index {index_name}...")
+        flow.set_dependencies(
+            upstream_tasks=[GenerateEsMapping(index_name)],
+            task=[ParseFiles(lookup_table=lookup_table, index_name=index_name)],
+        )
 
     try:
         client = Client()
@@ -302,7 +299,5 @@ if __name__ == "__main__":
     except prefect.utilities.exceptions.ClientError as e:
         logger.info("Project already exists")
 
-    flow.register(
-        project_name=project_name, labels=["development"]
-    )
+    flow.register(project_name=project_name, labels=["development"])
     flow.run()

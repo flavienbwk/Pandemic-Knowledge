@@ -113,9 +113,11 @@ Maybe you want to instanciate multiple agents automatically ?
 docker-compose -f agent/docker-compose.yml up -d --build --scale agent=3 agent
 ```
 
-### Inject COVID-19 data
+### COVID-19 data
 
 Injection scripts should are scheduled in Prefect so they automatically inject data with the latest news (delete + inject).
+
+#### Injecting data
 
 There are several data source supported by Pandemic Knowledge
 
@@ -162,6 +164,25 @@ There are several data source supported by Pandemic Knowledge
 
 5. Start making your dashboards in [Kibana](https://localhost:5601) !
 
+#### News
+
+1. Run the Google News crawler :
+
+  ```bash
+  docker-compose -f crawl.docker-compose.yml up --build
+  ```
+
+2. In Kibana, create a `news_*` index pattern
+
+3. **Edit** the index pattern fields :
+
+  | Name | Type                                                  | Format  |
+  | ---- | ----------------------------------------------------- | ------- |
+  | img  | string                                                | **Url** |
+  | link | string **with Type: Image** with empty _URL template_ | **Url** |
+
+4. Create your visualisation
+
 <details>
 <summary>Useful commands</summary>
 
@@ -181,4 +202,5 @@ docker-compose up -d minio
 docker-compose up -d prefect_postgres prefect_hasura prefect_graphql prefect_towel prefect_apollo prefect_ui
 docker-compose -f agent/docker-compose.yml up -d --build --scale agent=3 agent
 ```
+
 </details>

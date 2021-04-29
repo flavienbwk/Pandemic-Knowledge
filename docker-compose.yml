@@ -3,11 +3,8 @@ version: "3.7"
 services:
     prefect_setup:
         build: ./prefect
-        tty: true
         networks:
             - prefect-server
-        ports:
-            - 8080:8080
 
     prefect_postgres:
         image: "postgres:11"

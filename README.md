@@ -21,7 +21,7 @@ A fully-featured multi-source data pipeline for continuously extracting knowledg
 
 ## Context
 
-This project was realized over 4 days as part of a MSc hackathon from [ETNA](https://etna.io), a french computer science scool.
+This project was realized over 4 days as part of a MSc hackathon from [ETNA](https://etna.io), a french computer science school.
 
 The incentives were both to experiment/prototype a big data pipeline and contribute to an open source project.
 

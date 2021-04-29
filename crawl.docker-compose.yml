@@ -4,7 +4,7 @@ services:
 
   crawl:
     build: ./flow
-    command: python3 /usr/app/crawl.py
+    command: python3 /usr/app/crawl_google_news.py
     volumes:
       - /srv/docker/prefect/flows:/root/.prefect/flows
       - "./flow/scripts:/usr/app:ro"

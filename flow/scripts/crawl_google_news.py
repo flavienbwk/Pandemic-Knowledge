@@ -151,13 +151,13 @@ with Flow("Crawl news and insert", schedule=schedule) as flow:
         keyword_tasks=dict(index_name=index_name),
     )
 
-try:
-    client = Client()
-    client.create_project(project_name="pandemic-knowledge-crawl-googlenews")
-except prefect.utilities.exceptions.ClientError as e:
-    logger.info("Project already exists")
+if __name__ == "__main__":
+    try:
+        client = Client()
+        client.create_project(project_name="pandemic-knowledge-crawl-googlenews")
+    except prefect.utilities.exceptions.ClientError as e:
+        logger.info("Project already exists")
 
-flow.register(
-    project_name="pandemic-knowledge-crawl-googlenews", labels=["development"]
-)
-flow.run()
+    flow.register(
+        project_name="pandemic-knowledge-crawl-googlenews", labels=["development"]
+    )

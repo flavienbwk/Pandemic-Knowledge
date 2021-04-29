@@ -1,14 +1,14 @@
-version: "3.7"
+version: "3"
 
 services:
 
-  searchkit:
-    build: ./
-    environment:
-      ELASTIC_SCHEME: ${ELASTIC_SCHEME}
-      ELASTIC_PORT: ${ELASTIC_PORT}
-      ELASTIC_ENDPOINT: ${ELASTIC_ENDPOINT}
-      ELASTIC_USER: ${ELASTICSEARCH_USER}
-      ELASTIC_PWD: ${ELASTICSEARCH_PWD}
-    ports:
-        - 3000:3000
+    app:
+        build: ./app
+        restart: always
+        ports:
+            - "8080:3000"
+        volumes:
+            - ./app/app:/app
+        environment:
+            NODE_ENV: "development"
+            CHOKIDAR_USEPOLLING: "true"

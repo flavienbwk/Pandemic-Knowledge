@@ -7,7 +7,7 @@ A fully-featured multi-source data pipeline for continuously extracting knowledg
 - Contamination figures
 - Vaccination figures
 - Death figures
-- COVID-19-related news
+- COVID-19-related news (Google News)
 
 ## What you can realize
 
@@ -139,7 +139,7 @@ There are several data source supported by Pandemic Knowledge
     docker-compose -f insert.docker-compose.yml up --build insert_owid
     ```
 
-3. On Kibana, create an index pattern `contamination_owid_*`
+3. In [Kibana](https://localhost:5601), create an index pattern `contamination_owid_*`
 
 4. Once injected, we recommend to adjust the number of replicas [in the DevTool](https://localhost:5601/app/dev_tools#/console) :
 
@@ -152,7 +152,10 @@ There are several data source supported by Pandemic Knowledge
     }
     ```
 
-### Useful commands
+5. Start making your dashboards in [Kibana](https://localhost:5601) !
+
+<details>
+<summary>Useful commands</summary>
 
 To stop everything :
 
@@ -170,3 +173,4 @@ docker-compose up -d minio
 docker-compose up -d prefect_postgres prefect_hasura prefect_graphql prefect_towel prefect_apollo prefect_ui
 docker-compose -f agent/docker-compose.yml up -d --build --scale agent=3 agent
 ```
+</details>

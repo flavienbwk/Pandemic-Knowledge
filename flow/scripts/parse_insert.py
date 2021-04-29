@@ -101,7 +101,7 @@ def format_location(location_name):
 
     return locations_cache[location_name]
 
-def format_row(row, columns_indexes, filename):
+def format_row(row, columns_indexes, filename, bucket_name):
     date_start, date_end = format_date(row[columns_indexes["date"]])
     location = format_location(row[columns_indexes["location"]])
     if location is None:
@@ -114,12 +114,14 @@ def format_row(row, columns_indexes, filename):
         "date_start": date_start,
         "date_end": date_end,
         "location": location[0],
-        "cases": cases,
         "filename": filename,
         "iso_code2": location[1],
         "max_population": max_population,
         "percentage": percentage
     }
+
+    formatted["vaccinated" if bucket_name == "vaccination" else "confirmed"] = cases
+
     return formatted
 
 def inject_rows_to_es(rows, bucket_name):
@@ -170,7 +172,7 @@ def parse_file(minio_client, obj):
         if malformed_csv is True:
             return []
         for row in tqdm(reader, unit="entry"):
-            row = format_row(row, columns_indexes, obj.object_name)
+            row = format_row(row, columns_indexes, obj.object_name, obj.bucket_name)
             if row is not None:
                 yield row
     return []
@@ -225,7 +227,7 @@ class GenerateEsMapping(Task):
                 logger.error("Error type: {}".format(response['error']['type']))
                 raise Exception("Unable to create index mapping")
 
-schedule = IntervalSchedule(interval=timedelta(minutes=10))
+schedule = IntervalSchedule(interval=timedelta(hours=24), start_date=datetime.utcnow() + timedelta(seconds=1))
 
 with Flow("Parse and insert csv files", schedule) as flow:
     for bucket in ["vaccination", "contamination"]:

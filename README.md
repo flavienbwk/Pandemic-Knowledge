@@ -63,10 +63,7 @@ Then :
 
 ```bash
 docker-compose -f create-certs.yml run --rm create_certs
-```
-
-```bash
-docker-compose up -d es01 es02 es03 kibana enterprise_search
+docker-compose up -d es01 es02 es03 kibana
 ```
 
 ### Initialize Prefect
@@ -222,7 +219,7 @@ docker-compose -f crawl.docker-compose.yml down
 To start each service, step by step :
 
 ```bash
-docker-compose up -d es01 es02 es03 kibana enterprise_search
+docker-compose up -d es01 es02 es03 kibana
 docker-compose up -d minio
 docker-compose up -d prefect_postgres prefect_hasura prefect_graphql prefect_towel prefect_apollo prefect_ui
 docker-compose -f agent/docker-compose.yml up -d --build --scale agent=3 agent

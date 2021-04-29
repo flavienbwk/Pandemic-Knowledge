@@ -1,12 +1,13 @@
 import os
 import dateparser
 import uuid
-import json
 import prefect
 import clevercsv
 import traceback
 from tqdm import tqdm
 from prefect import Flow, Task, Client, task
+from datetime import timedelta, datetime
+from prefect.schedules import IntervalSchedule
 from minio import Minio
 from elasticsearch import Elasticsearch, helpers
 from geopy.geocoders import Nominatim
@@ -43,9 +44,7 @@ columns_allowed = {
 
 extra_locations = {"EL": "GR"}
 
-locations_cache = {
-    "World": None
-}
+locations_cache = {"World": None}
 
 
 def get_es_instance():
@@ -128,7 +127,7 @@ def format_row(lookup_table, row, headers, filename):
     nb_recovered = pick_nonempty_cell(row, headers, columns_allowed["recovered"])
     nb_vaccinated = pick_nonempty_cell(row, headers, columns_allowed["vaccinated"])
     nb_tested = pick_nonempty_cell(row, headers, columns_allowed["tested"])
-    if location and date_start and nb_cases:
+    if location != None and date_start != None and nb_cases != None:
         return {
             "date_start": date_start,
             "date_end": date_end,
@@ -216,16 +215,13 @@ def get_files(bucket_name):
 
 
 class ParseFiles(Task):
-
     def run(self, lookup_table, index_name):
         logger.info(lookup_table)
         for file in tqdm(get_files(bucket_name=bucket_name)):
             object_name = file.object_name
             try:
                 logger.info(f"Processing file {object_name}...")
-                process_file(
-                    lookup_table, index_name, bucket_name, object_name
-                )
+                process_file(lookup_table, index_name, bucket_name, object_name)
             except Exception as e:
                 logger.error(traceback.format_exc())
                 logger.error(e)
@@ -282,15 +278,19 @@ def read_lookup_table(lookup_file_path: str):
     return lookup
 
 
+lookup_table = read_lookup_table("/usr/app/UID_ISO_FIPS_LookUp_Table.csv")
+
+schedule = IntervalSchedule(
+    start_date=datetime.utcnow() + timedelta(seconds=1), interval=timedelta(hours=24)
+)
+with Flow(flow_name, schedule=schedule) as flow:
+    es_mapping_task = GenerateEsMapping()
+    index_name = es_mapping_task()
+
+    parse_files_task = ParseFiles()
+    parse_files_task(lookup_table=lookup_table, index_name=index_name)
+
 if __name__ == "__main__":
-    lookup_table = read_lookup_table("/usr/app/UID_ISO_FIPS_LookUp_Table.csv")
-
-    with Flow(flow_name) as flow:
-        es_mapping_task = GenerateEsMapping()
-        index_name = es_mapping_task()
-
-        parse_files_task = ParseFiles()
-        parse_files_task(lookup_table=lookup_table, index_name=index_name)
 
     try:
         client = Client()
@@ -298,5 +298,7 @@ if __name__ == "__main__":
     except prefect.utilities.exceptions.ClientError as e:
         logger.info("Project already exists")
 
-    flow.register(project_name=project_name, labels=["development"])
+    flow.register(
+        project_name=project_name, labels=["development"], add_default_labels=False
+    )
     flow.run()

@@ -11,6 +11,8 @@ from datetime import timedelta, datetime
 from prefect.schedules import IntervalSchedule
 from elasticsearch import Elasticsearch, helpers
 from geopy.geocoders import Nominatim
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.util.retry import Retry
 
 from mapping import mapping
 
@@ -36,10 +38,11 @@ columns_allowed = {
     "location": ["maille_nom"],
     "location_name": ["maille_nom"],
     "cases": ["cas_confirmes"],
-    "deaths": ["new_deaths"],
+    "confirmed": ["cas_confirmes"],
+    "deaths": ["deces"],
     "recovered": ["gueris"],
     "vaccinated": [],
-    "tested": [],
+    "tested": ["depistes"],
 }
 
 extra_locations = {"EL": "GR"}
@@ -75,28 +78,6 @@ def format_location(lookup_table, location_name):
         return locations_cache[location_name]
     if location_name in lookup_table:
         return lookup_table[location_name]
-
-    logger.info(f"Guessing geolocation for {location_name}")
-    geolocator = Nominatim(user_agent="pandemic-knowledge")
-    location = geolocator.geocode(
-        extra_locations[location_name]
-        if location_name in extra_locations
-        else location_name,
-        addressdetails=True,
-    )
-
-    if location and location.raw:
-        logger.info(f"Found {location.latitude}, {location.longitude}")
-        if "address" in location.raw and "country_code" in location.raw["address"]:
-            locations_cache[location_name] = (
-                {"lat": location.latitude, "lon": location.longitude},
-                location.raw["address"]["country_code"].upper(),
-            )
-            return locations_cache[location_name]
-    locations_cache[location_name] = None
-    logger.error(
-        f"Failed to locate (no country code and/or coordinates) for {location}"
-    )
     return None
 
 
@@ -127,11 +108,11 @@ def format_row(lookup_table, row, headers, filename):
     nb_recovered = pick_nonempty_cell(row, headers, columns_allowed["recovered"])
     nb_vaccinated = pick_nonempty_cell(row, headers, columns_allowed["vaccinated"])
     nb_tested = pick_nonempty_cell(row, headers, columns_allowed["tested"])
-    if location and date_start and nb_cases:
+    if date_start != None:
         return {
             "date_start": date_start,
             "date_end": date_end,
-            "location": location[0],
+            "location": location[0] if location else None,
             "location_name": location_name,
             "cases": int(float(nb_cases)) if nb_cases else 0,
             "confirmed": int(float(nb_cases)) if nb_cases else 0,
@@ -140,9 +121,10 @@ def format_row(lookup_table, row, headers, filename):
             "vaccinated": int(float(nb_vaccinated)) if nb_vaccinated else 0,
             "tested": int(float(nb_tested)) if nb_tested else 0,
             "filename": filename,
-            "iso_code2": location[1] if len(location) else None,
-            "iso_region2": f"FR-{row[2][4:]}",
+            "iso_code2": location[1] if location else None,
+            "iso_region2": str(row[2]).replace("DEP", "FR"),
         }
+    logger.warning(f"format_row(): Invalid row : {row}")
     return None
 
 
@@ -190,7 +172,7 @@ def process_file(lookup_table, index_name, file_path):
                 inject_rows_to_es(to_inject, index_name)
                 to_inject = []
         else:
-            logger.info("process_file(): Invalid row")
+            logger.warning("process_file(): Invalid row")
     if len(to_inject) > 0:
         inject_rows_to_es(to_inject, index_name)
 
@@ -200,7 +182,12 @@ class ParseFiles(Task):
         for file_uri in tqdm(http_csv_uris):
             logger.info(f"Processing file {file_uri}...")
             file_path = f"/tmp/{uuid.uuid4()}"
-            r = requests.get(file_uri)
+            session = requests.Session()
+            retry = Retry(connect=3, backoff_factor=0.5)
+            adapter = HTTPAdapter(max_retries=retry)
+            session.mount("http://", adapter)
+            session.mount("https://", adapter)
+            r = session.get(file_uri)
             with open(file_path, "wb") as f:
                 f.write(r.content)
             process_file(lookup_table, index_name, file_path)
@@ -212,7 +199,7 @@ class GenerateEsMapping(Task):
         Returns:
             str: index_name
         """
-        index_name = f"{project_name.replace('-', '_')}"
+        index_name = "contamination_opencovid19_fr"
         es_inst = get_es_instance()
         logger.info("Generating mapping for index {}".format(index_name))
         es_inst.indices.delete(index=index_name, ignore=[400, 404])
@@ -283,4 +270,3 @@ if __name__ == "__main__":
     flow.register(
         project_name=project_name, labels=["development"], add_default_labels=False
     )
-    # flow.run()

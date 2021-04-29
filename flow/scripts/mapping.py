@@ -19,6 +19,7 @@ mapping = {
             "recovered": {"type": "long"},
             "filename": {"type": "text"},
             "iso_code2": {"type": "text", "fields": {"keyword": {"type": "keyword"}}},
+            "iso_region2": {"type": "text", "fields": {"keyword": {"type": "keyword"}}},
         }
     }
 }

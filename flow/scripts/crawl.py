@@ -90,7 +90,7 @@ def get_news(googlenews: GoogleNews, lang: str, search_tag: str) -> Iterable:
 class GetNews(Task):
     def run(self, index_name):
         googlenews = GoogleNews(
-            period="24h",  # TODO(): Improve using googlenews.set_time_range('02/01/2020','02/28/2020')
+            period="7d",  # TODO(): Improve using googlenews.set_time_range('02/01/2020','02/28/2020')
             encode="utf-8",
         )
         news_to_inject = []
@@ -144,8 +144,8 @@ schedule = IntervalSchedule(interval=timedelta(hours=24))
 with Flow("Crawl news and insert", schedule=schedule) as flow:
     index_name = "news_googlenews"
     flow.set_dependencies(
-        task=GetNews(),
         upstream_tasks=[GenerateEsMapping(index_name)],
+        task=GetNews(),
         keyword_tasks=dict(index_name=index_name),
     )
 

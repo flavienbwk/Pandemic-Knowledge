@@ -86,6 +86,8 @@ docker-compose -f agent/docker-compose.yml up -d --build --scale agent=3 agent
 
 ### Inject COVID-19 data
 
+#### Situation
+
 There are several data source supported by Pandemic Knowledge
 
 - [Our World In Data](https://ourworldindata.org/coronavirus-data); used by Google
@@ -125,6 +127,25 @@ PUT /contamination_owid_*/_settings
     }
 }
 ```
+
+#### News
+
+1. Run the Google News crawler :
+
+  ```bash
+  docker-compose -f crawl.docker-compose.yml up --build
+  ```
+
+2. In Kibana, create a `news_*` index pattern
+
+3. **Edit** the index pattern fields :
+
+  | Name | Type                        | Format  |
+  | ---- | --------------------------- | ------- |
+  | img  | string                      | **Url** |
+  | link | string **with Type: Image** | **Url** |
+
+4. Create your visualisation
 
 ### Useful commands
 

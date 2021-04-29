@@ -9,6 +9,16 @@ A fully-featured dashboard and data pipeline for extracting knowledge from COVID
 - Death figures
 - COVID-19-related news
 
+## What can be done
+
+Live contamination and vaccination world map.
+
+![Live contamination and vaccination world map](./illustrations/live_dashboard.png)
+
+Latest news (24h) !
+
+![Last news, live !](./illustrations/last_news.png)
+
 ## Install
 
 Below, you'll find the procedure to process COVID-related file and news into the Pandemic Knowledge database (elasticsearch).
@@ -97,6 +107,8 @@ docker-compose -f agent/docker-compose.yml up -d --build --scale agent=3 agent
 
 ### Inject COVID-19 data
 
+Injection scripts should are scheduled in Prefect so they automatically inject data with the latest news (delete + inject).
+
 There are several data source supported by Pandemic Knowledge
 
 - [Our World In Data](https://ourworldindata.org/coronavirus-data); used by Google
@@ -107,35 +119,37 @@ There are several data source supported by Pandemic Knowledge
   - docker-compose slug : `insert_france`
   - Format : CSV
 
-Start MinIO and import your files according to the buckets evoked upper :
+1. Start MinIO and import your files according to the buckets evoked upper.
 
-```bash
-docker-compose up -d minio
-```
+    For _Our World In Data_, create the `contamination-owid` bucket and import the CSV file inside.
 
-> MinIO is available at `localhost:9000`
+    ```bash
+    docker-compose up -d minio
+    ```
 
-Download dependencies and start the injection service of your choice. For instance :
+    > MinIO is available at `localhost:9000`
 
-```bash
-pip3 install -r ./flow/requirements.txt
-docker-compose -f insert.docker-compose.yml up --build insert_owid
-```
+2. Download dependencies and start the injection service of your choice. For instance :
 
-Once the flow registered, start it in the Prefect UI !
+    ```bash
+    pip3 install -r ./flow/requirements.txt
+    docker-compose -f insert.docker-compose.yml up --build insert_owid
+    ```
 
-On Kibana, create an index pattern `contamination_owid_*`
+3. Once the flow registered, you can start it in the Prefect UI !
 
-Once executed, we recommend to adjust the number of replicas [in the DevTool](https://localhost:5601/app/dev_tools#/console) :
+4. On Kibana, create an index pattern `contamination_owid_*`
 
-```json
-PUT /contamination_owid_*/_settings
-{
-    "index" : {
-        "number_of_replicas" : "2"
+5. Once injected, we recommend to adjust the number of replicas [in the DevTool](https://localhost:5601/app/dev_tools#/console) :
+
+    ```json
+    PUT /contamination_owid_*/_settings
+    {
+        "index" : {
+            "number_of_replicas" : "2"
+        }
     }
-}
-```
+    ```
 
 ### Useful commands
 

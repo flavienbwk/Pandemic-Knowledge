@@ -2,6 +2,14 @@
 
 ![Pandemic Knowledge logo](./pandemic_knowledge.png)
 
+<p align="center">
+    <a href="https://travis-ci.com/flavienbwk/Pandemic-Knowledge" target="_blank">
+        <img src="https://travis-ci.org/flavienbwk/Pandemic-Knowledge.svg?branch=develop"/>
+    </a>
+    <a href="https://github.com/psf/black"><img alt="Code style: black" src="https://img.shields.io/badge/code%20style-black-000000.svg"></a>
+    <a href="./LICENSE"><img atl="Repo license MIT" src="https://img.shields.io/badge/License-MIT-yellow.svg"/></a>
+</p>
+
 A fully-featured multi-source data pipeline for continuously extracting knowledge from COVID-19 data.
 
 - Contamination figures
@@ -9,7 +17,7 @@ A fully-featured multi-source data pipeline for continuously extracting knowledg
 - Death figures
 - COVID-19-related news (Google News)
 
-## What you can realize
+## What you can achieve
 
 |                        Live contaminations map + Latest news                        |                   Last 7 days news                    |
 | :---------------------------------------------------------------------------------: | :---------------------------------------------------: |

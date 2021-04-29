@@ -109,21 +109,15 @@ Access the web UI at [localhost:8081](http://localhost:8081)
 
 Agents are services that run your scheduled flows.
 
-Open and optionally edit the [`agent/config.toml`](./agent/config.toml) file.
+1. Open and optionally edit the [`agent/config.toml`](./agent/config.toml) file.
 
-Then you can run :
+2. Let's instanciate 3 workers :
 
-```bash
-docker-compose -f agent/docker-compose.yml up -d
-```
+  ```bash
+  docker-compose -f agent/docker-compose.yml up -d --build --scale agent=3 agent
+  ```
 
-> :information_source: You can run the agent on another machine than the one with the Prefect server. Edit the [`agent/config.toml`](./agent/config.toml) file for that.
-
-Maybe you want to instanciate multiple agents automatically ?
-
-```bash
-docker-compose -f agent/docker-compose.yml up -d --build --scale agent=3 agent
-```
+  > :information_source: You can run the agent on another machine than the one with the Prefect server. Edit the [`agent/config.toml`](./agent/config.toml) file for that.
 
 ### COVID-19 data
 

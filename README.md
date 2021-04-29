@@ -11,13 +11,9 @@ A fully-featured dashboard and data pipeline for extracting knowledge from COVID
 
 ## What can be done
 
-Live contamination and vaccination world map.
-
-![Live contamination and vaccination world map](./illustrations/live_dashboard.png)
-
-Latest news (24h) !
-
-![Last news, live !](./illustrations/last_news.png)
+|                      Live contaminations and vaccinations map                       |                  Latest news (24h)                  |
+| :---------------------------------------------------------------------------------: | :-------------------------------------------------: |
+| ![Live contamination and vaccination world map](./illustrations/live_dashboard.png) | ![Last news, live !](./illustrations/last_news.png) |
 
 ## Install
 
@@ -83,13 +79,7 @@ Access the web UI at [localhost:8081](http://localhost:8081)
 
 Agents are services that run your scheduled flows.
 
-Open and edit the [`agent/config.toml`](./agent/config.toml) file.
-
-> :information_source: In each `config.toml`, you will find the `172.17.0.1` IP address. This is the IP of the Docker daemon on which are exposed all exposed ports of your containers. This allows   containers on launched from different docker-compose networks to communicate. Change it if yours is different (check your daemon IP by typing `ip a | grep docker0`).
-> 
-> ![Docker interface IP](./docker_interface.png)
-> 
-> Here, mine is `192.168.254.1` but the default is generally to `172.17.0.1`.
+Open and optionally edit the [`agent/config.toml`](./agent/config.toml) file.
 
 Then you can run :
 

@@ -136,11 +136,9 @@ There are several data source supported by Pandemic Knowledge
     docker-compose -f insert.docker-compose.yml up --build insert_owid
     ```
 
-3. Once the flow registered, you can start it in the Prefect UI !
+3. On Kibana, create an index pattern `contamination_owid_*`
 
-4. On Kibana, create an index pattern `contamination_owid_*`
-
-5. Once injected, we recommend to adjust the number of replicas [in the DevTool](https://localhost:5601/app/dev_tools#/console) :
+4. Once injected, we recommend to adjust the number of replicas [in the DevTool](https://localhost:5601/app/dev_tools#/console) :
 
     ```json
     PUT /contamination_owid_*/_settings

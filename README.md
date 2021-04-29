@@ -140,10 +140,10 @@ PUT /contamination_owid_*/_settings
 
 3. **Edit** the index pattern fields :
 
-  | Name | Type                        | Format  |
-  | ---- | --------------------------- | ------- |
-  | img  | string                      | **Url** |
-  | link | string **with Type: Image** | **Url** |
+  | Name | Type                                                  | Format  |
+  | ---- | ----------------------------------------------------- | ------- |
+  | img  | string                                                | **Url** |
+  | link | string **with Type: Image** with empty _URL template_ | **Url** |
 
 4. Create your visualisation
 

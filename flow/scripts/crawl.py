@@ -5,7 +5,7 @@ import uuid
 import prefect
 from elasticsearch import Elasticsearch, helpers
 from prefect import Flow, Task, Client
-from datetime import timedelta
+from datetime import timedelta, datetime
 from prefect.schedules import IntervalSchedule
 from GoogleNews import GoogleNews
 
@@ -90,7 +90,7 @@ def get_news(googlenews: GoogleNews, lang: str, search_tag: str) -> Iterable:
 class GetNews(Task):
     def run(self, index_name):
         googlenews = GoogleNews(
-            period="7d",  # TODO(): Improve using googlenews.set_time_range('02/01/2020','02/28/2020')
+            period="24h",  # TODO(): Improve using googlenews.set_time_range('02/01/2020','02/28/2020')
             encode="utf-8",
         )
         news_to_inject = []
@@ -140,7 +140,9 @@ class GenerateEsMapping(Task):
                 raise Exception("Unable to create index mapping")
 
 
-schedule = IntervalSchedule(interval=timedelta(hours=24))
+schedule = IntervalSchedule(
+    start_date=datetime.utcnow() + timedelta(seconds=1), interval=timedelta(hours=24)
+)
 with Flow("Crawl news and insert", schedule=schedule) as flow:
     index_name = "news_googlenews"
     flow.set_dependencies(

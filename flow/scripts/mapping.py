@@ -11,7 +11,6 @@ mapping = {
             },
             "location": {"type": "geo_point"},
             "location_name": {"type": "text", "fields": {"keyword": {"type": "keyword"}}},
-            "cases": {"type": "long"},
             "confirmed": {"type": "long"},
             "deaths": {"type": "long"},
             "vaccinated": {"type": "long"},

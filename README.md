@@ -39,6 +39,18 @@ Below, you'll find the procedure to process COVID-related file and news into the
 
 The process is **scheduled** to run every 24 hours so you can update the files and obtain the latest news
 
+- [Pandemic-Knowledge](#pandemic-knowledge)
+  - [What you can achieve](#what-you-can-achieve)
+  - [Context](#context)
+  - [Install](#install)
+    - [Initialize elasticsearch](#initialize-elasticsearch)
+    - [Initialize Prefect](#initialize-prefect)
+    - [Run Prefect workers](#run-prefect-workers)
+    - [COVID-19 data](#covid-19-data)
+      - [Injecting data](#injecting-data)
+      - [News](#news)
+    - [News web app](#news-web-app)
+
 ### Initialize elasticsearch
 
 Raise your host's ulimits for ElasticSearch to handle high I/O :
@@ -183,6 +195,24 @@ There are several data source supported by Pandemic Knowledge
 
 4. Create your visualisation
 
+### News web app
+
+Browse through the news with our web application.
+
+![News web app](./illustrations/news_web_app.png)
+
+1. Make sure you've accepted the self-signed certificate of Elasticsearch at [`https://localhost:9200`](https://localhost:9200)
+
+2. Start-up the app
+
+    ```bash
+    docker-compose -f news_app/docker-compose.yml up --build -d
+    ```
+
+3. Discover the app at [`localhost:8080`](http://localhost:8080)
+
+---
+
 <details>
 <summary>Useful commands</summary>
 
@@ -192,6 +222,7 @@ To stop everything :
 docker-compose down
 docker-compose -f agent/docker-compose.yml down
 docker-compose -f insert.docker-compose.yml down
+docker-compose -f crawl.docker-compose.yml down
 ```
 
 To start each service, step by step :

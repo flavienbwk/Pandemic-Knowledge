@@ -2,14 +2,14 @@
 
 ![Pandemic Knowledge logo](./pandemic_knowledge.png)
 
-A fully-featured dashboard and data pipeline for extracting knowledge from COVID-19-related data.
+A fully-featured multi-source data pipeline for continuously extracting knowledge from COVID-19 data.
 
 - Contamination figures
 - Vaccination figures
 - Death figures
 - COVID-19-related news
 
-## What can be done
+## What you can realize
 
 |                        Live contaminations map + Latest news                        |                   Last 7 days news                    |
 | :---------------------------------------------------------------------------------: | :---------------------------------------------------: |
@@ -18,6 +18,12 @@ A fully-featured dashboard and data pipeline for extracting knowledge from COVID
 |            France 3-weeks live map (Kibana Canvas)            |                     Live vaccinations map                     |
 | :-----------------------------------------------------------: | :-----------------------------------------------------------: |
 | ![France Live Status](./illustrations/france_live_status.png) | ![World vaccination map](./illustrations/vaccination_map.png) |
+
+## Context
+
+This project was realized over 4 days as part of a MSc hackathon from [ETNA](https://etna.io), a french computer science scool.
+
+The incentives were both to experiment/prototype a big data pipeline and contribute to an open source project.
 
 ## Install
 

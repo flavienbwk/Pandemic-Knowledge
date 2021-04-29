@@ -36,7 +36,6 @@ columns_allowed = {
     "date": ["jour"],
     "location": ["dep"],
     "location_name": ["dep"],
-    "cases": [],
     "confirmed": ["P"],
     "deaths": [],
     "recovered": [],
@@ -102,7 +101,7 @@ def format_row(lookup_table, row, headers, filename):
         lookup_table, pick_nonempty_cell(row, headers, columns_allowed["location"])
     )
     location_name = pick_nonempty_cell(row, headers, columns_allowed["location_name"])
-    nb_cases = pick_nonempty_cell(row, headers, columns_allowed["cases"])
+    nb_confirmed = pick_nonempty_cell(row, headers, columns_allowed["confirmed"])
     nb_deaths = pick_nonempty_cell(row, headers, columns_allowed["deaths"])
     nb_recovered = pick_nonempty_cell(row, headers, columns_allowed["recovered"])
     nb_vaccinated = pick_nonempty_cell(row, headers, columns_allowed["vaccinated"])
@@ -113,15 +112,14 @@ def format_row(lookup_table, row, headers, filename):
             "date_end": date_end,
             "location": location[0] if location else None,
             "location_name": location_name,
-            "cases": int(float(nb_cases)) if nb_cases else 0,
-            "confirmed": int(float(nb_cases)) if nb_cases else 0,
+            "confirmed": int(float(nb_confirmed)) if nb_confirmed else 0,
             "deaths": int(float(nb_deaths)) if nb_deaths else 0,
             "recovered": int(float(nb_recovered)) if nb_recovered else 0,
             "vaccinated": int(float(nb_vaccinated)) if nb_vaccinated else 0,
             "tested": int(float(nb_tested)) if nb_tested else 0,
             "filename": filename,
             "iso_code2": location[1] if location else None,
-            "iso_region2": f"FR-{row[2]}",
+            "iso_region2": f"FR-{location_name}",
         }
     logger.warning(f"format_row(): Invalid row : {row}")
     return None

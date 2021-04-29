@@ -7,8 +7,8 @@ export class About extends Component {
         return (
             <div>
                 <h2>About</h2>
-                <p>Pandemic Knowledge is a simple UI designed to facilitate for all data accessibility about COVID-19</p>
-                <p>If you find an issue or have a suggestion, <a target="_blank" rel="noopener noreferrer" href="https://github.com/flavienbwk/deafboard">please open an issue on Github</a>.</p>
+                <p>A fully-featured multi-source data pipeline for continuously extracting knowledge from COVID-19 data.</p>
+                <p>If you find an issue or have a suggestion, <a target="_blank" rel="noopener noreferrer" href="https://github.com/flavienbwk/Pandemic-Knowledge">please open an issue on Github</a>.</p>
                 <hr />
                 <p>Version <b>{packageJson["version"]}</b></p>
             </div>

@@ -159,5 +159,7 @@ if __name__ == "__main__":
         logger.info("Project already exists")
 
     flow.register(
-        project_name="pandemic-knowledge-crawl-googlenews", labels=["development"]
+        project_name="pandemic-knowledge-crawl-googlenews",
+        labels=["development"],
+        add_default_labels=False,
     )

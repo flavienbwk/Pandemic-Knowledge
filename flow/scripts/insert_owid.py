@@ -300,4 +300,3 @@ if __name__ == "__main__":
     flow.register(
         project_name=project_name, labels=["development"], add_default_labels=False
     )
-    flow.run()

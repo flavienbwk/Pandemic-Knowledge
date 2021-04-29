@@ -195,7 +195,7 @@ class ParseFiles(Task):
 
 
 class GenerateEsMapping(Task):
-    def run(self) -> str:
+    def run(self, index_name) -> str:
         """
         Returns:
             str: index_name
@@ -250,7 +250,7 @@ schedule = IntervalSchedule(
 )
 with Flow(flow_name, schedule=schedule) as flow:
     es_mapping_task = GenerateEsMapping()
-    index_name = es_mapping_task()
+    index_name = es_mapping_task(index_name)
 
     parse_files_task = ParseFiles()
     parse_files_task(

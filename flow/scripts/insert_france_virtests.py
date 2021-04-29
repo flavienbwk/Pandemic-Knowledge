@@ -25,7 +25,7 @@ ELASTIC_USER = os.environ.get("ELASTIC_USER")
 ELASTIC_PWD = os.environ.get("ELASTIC_PWD")
 ELASTIC_ENDPOINT = os.environ.get("ELASTIC_ENDPOINT")
 
-csv_endpoint = "https://www.data.gouv.fr/en/datasets/r/406c6a23-e283-4300-9484-54e78c8ae675"
+csv_endpoint = "https://static.data.gouv.fr/resources/donnees-relatives-aux-resultats-des-tests-virologiques-covid-19/20210428-190945/sp-pos-quot-dep-2021-04-28-19h09.csv"
 project_name = f"pandemic-knowledge-santepublic-tests"
 index_name = "contamination_santepublique_vir_tests_fr"
 flow_name = project_name
@@ -155,8 +155,6 @@ def parse_file(lookup_table, file_path):
         for i, header in enumerate(headers_list):
             headers[header] = i
         for row in tqdm(reader, unit="entry"):
-            if row[1] != "departement":  # multiple granularities
-                continue
             yield format_row(lookup_table, row, headers, file_path)
     return []
 
@@ -193,7 +191,7 @@ class ParseFiles(Task):
 
 
 class GenerateEsMapping(Task):
-    def run(self) -> str:
+    def run(self, index_name) -> str:
         """
         Returns:
             str: index_name
@@ -248,7 +246,7 @@ schedule = IntervalSchedule(
 )
 with Flow(flow_name, schedule=schedule) as flow:
     es_mapping_task = GenerateEsMapping()
-    index_name = es_mapping_task()
+    index_name = es_mapping_task(index_name)
 
     parse_files_task = ParseFiles()
     parse_files_task(
@@ -265,6 +263,7 @@ if __name__ == "__main__":
     except prefect.utilities.exceptions.ClientError as e:
         logger.info("Project already exists")
 
-    flow.register(
-        project_name=project_name, labels=["development"], add_default_labels=False
-    )
+    # flow.register(
+    #     project_name=project_name, labels=["development"], add_default_labels=False
+    # )
+    flow.run()

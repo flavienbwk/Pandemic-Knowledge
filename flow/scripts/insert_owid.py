@@ -27,6 +27,7 @@ ELASTIC_ENDPOINT = os.environ.get("ELASTIC_ENDPOINT")
 
 bucket_name = "contamination-owid"
 project_name = f"pandemic-knowledge-{bucket_name}"
+index_name = f"{bucket_name.replace('-', '_')}"
 flow_name = project_name
 
 logger = prefect.context.get("logger")
@@ -229,12 +230,11 @@ class ParseFiles(Task):
 
 
 class GenerateEsMapping(Task):
-    def run(self) -> str:
+    def run(self, index_name) -> str:
         """
         Returns:
             str: index_name
         """
-        index_name = f"{bucket_name.replace('-', '_')}"
         es_inst = get_es_instance()
         logger.info("Generating mapping for index {}".format(index_name))
         es_inst.indices.delete(index=index_name, ignore=[400, 404])
@@ -285,7 +285,7 @@ schedule = IntervalSchedule(
 )
 with Flow(flow_name, schedule=schedule) as flow:
     es_mapping_task = GenerateEsMapping()
-    index_name = es_mapping_task()
+    index_name = es_mapping_task(index_name)
 
     parse_files_task = ParseFiles()
     parse_files_task(lookup_table=lookup_table, index_name=index_name)

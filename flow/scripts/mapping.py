@@ -20,6 +20,8 @@ mapping = {
             "filename": {"type": "text"},
             "iso_code2": {"type": "text", "fields": {"keyword": {"type": "keyword"}}},
             "iso_region2": {"type": "text", "fields": {"keyword": {"type": "keyword"}}},
+            "max_population": {"type": "long"},
+            "percentage": {"type": "float"}
         }
     }
 }

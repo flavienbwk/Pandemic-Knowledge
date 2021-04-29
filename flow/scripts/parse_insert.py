@@ -13,6 +13,7 @@ from elasticsearch import Elasticsearch, helpers
 from ssl import create_default_context
 from geopy.geocoders import Nominatim
 from iso3166 import countries
+from prefect.schedules import IntervalSchedule
 
 from mapping import mapping
 
@@ -27,12 +28,11 @@ ELASTIC_USER = os.environ.get("ELASTIC_USER")
 ELASTIC_PWD = os.environ.get("ELASTIC_PWD")
 ELASTIC_ENDPOINT = os.environ.get("ELASTIC_ENDPOINT")
 
-elastic_headers = ["date_start", "date_end", "location", "cases"]
-
 columns_allowed = {
     "date": ["YearWeekISO", "dateRep", "date"],
     "location": ["ReportingCountry", "location", "countriesAndTerritories"],
-    "cases": ["NumberDosesReceived", "total_vaccinations", "cases"]
+    "cases": ["NumberDosesReceived", "new_vaccinations", "cases", "new_cases"],
+    "population": ["population"]
 }
 
 logger = prefect.context.get("logger")
@@ -41,7 +41,9 @@ extra_locations = {
     "EL": "GR"
 }
 
-locations_cache = {}
+locations_cache = {
+    "World": None
+}
 
 def get_es_instance():
     es_inst = Elasticsearch(
@@ -80,27 +82,43 @@ def format_location(location_name):
     geolocator = Nominatim(user_agent="pandemic-knowledge")
     location = geolocator.geocode(extra_locations[location_name] if location_name in extra_locations else location_name, addressdetails=True)
 
-    if location is None:
+    if location is None or "country_code" not in location.raw['address']:
         logger.info(location_name)
+        locations_cache[location_name] = None
         return None
 
-    locations_cache[location_name] = ({
-        "lat": location.latitude,
-        "lon": location.longitude
-    }, location.raw['address']['country_code'].upper())
+    iso2 = location.raw['address']['country_code'].upper()
+
+    iso3 = countries.get(iso2).alpha3
+
+    locations_cache[location_name] = (
+        {
+            "lat": location.latitude,
+            "lon": location.longitude
+        },
+        iso2
+    )
 
     return locations_cache[location_name]
 
 def format_row(row, columns_indexes, filename):
     date_start, date_end = format_date(row[columns_indexes["date"]])
     location = format_location(row[columns_indexes["location"]])
+    if location is None:
+        return None
+    max_population = int(float(row[columns_indexes["population"]])) if row[columns_indexes["population"]] != "" else 0
+    cases = int(float(row[columns_indexes["cases"]])) if row[columns_indexes["cases"]] != "" else 0
+    percentage = float(cases) / float(max_population) * 100 if max_population != 0 else None
+
     formatted = {
         "date_start": date_start,
         "date_end": date_end,
         "location": location[0],
-        "cases": int(row[columns_indexes["cases"]]) if row[columns_indexes["cases"]] != "" else 0,
+        "cases": cases,
         "filename": filename,
-        "iso_code2": location[1]
+        "iso_code2": location[1],
+        "max_population": max_population,
+        "percentage": percentage
     }
     return formatted
 
@@ -152,7 +170,9 @@ def parse_file(minio_client, obj):
         if malformed_csv is True:
             return []
         for row in tqdm(reader, unit="entry"):
-            yield format_row(row, columns_indexes, obj.object_name)
+            row = format_row(row, columns_indexes, obj.object_name)
+            if row is not None:
+                yield row
     return []
 
 class ParseFiles(Task):
@@ -205,7 +225,9 @@ class GenerateEsMapping(Task):
                 logger.error("Error type: {}".format(response['error']['type']))
                 raise Exception("Unable to create index mapping")
 
-with Flow("Parse and insert csv files") as flow:
+schedule = IntervalSchedule(interval=timedelta(minutes=10))
+
+with Flow("Parse and insert csv files", schedule) as flow:
     for bucket in ["vaccination", "contamination"]:
         flow.set_dependencies(
             task=ParseFiles(),
@@ -219,5 +241,3 @@ except prefect.utilities.exceptions.ClientError as e:
     logger.info("Project already exists")
 
 flow.register(project_name="pandemic-knowledge", labels=["development"])
-
-flow.run()

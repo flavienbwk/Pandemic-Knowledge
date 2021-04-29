@@ -1,11 +1,13 @@
 version: "3.7"
 
 services:
+    prefect_setup:
+        build: ./prefect
+        networks:
+            - prefect-server
 
-    postgres:
+    prefect_postgres:
         image: "postgres:11"
-        ports:
-            - "${POSTGRES_HOST_PORT:-5432}:5432"
         environment:
             POSTGRES_USER: ${POSTGRES_USER}
             POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -15,16 +17,22 @@ services:
         networks:
             - prefect-server
         restart: "always"
+        healthcheck:
+            test: pg_isready -q -d $${POSTGRES_DB} -U $${POSTGRES_USER} || exit 1
+            interval: 10s
+            timeout: 2s
+            retries: 60
+            start_period: 2s
         command:
             - "postgres"
             # explicitly set max connections
             - "-c"
             - "max_connections=150"
-        
-    hasura:
-        image: "hasura/graphql-engine:v1.3.0"
+
+    prefect_hasura:
+        image: "hasura/graphql-engine:v1.3.3"
         ports:
-            - "${HASURA_HOST_PORT:-3000}:3000"
+            - "3000:3000"
         command: "graphql-engine serve"
         environment:
             HASURA_GRAPHQL_DATABASE_URL: ${DB_CONNECTION_URL}
@@ -35,67 +43,91 @@ services:
         networks:
             - prefect-server
         restart: "always"
+        healthcheck:
+            test: wget -O - http://hasura:3000/healthz &>/dev/null || exit 1
+            interval: 10s
+            timeout: 2s
+            retries: 60
+            start_period: 1s
         depends_on:
-            - postgres
-    
-    graphql:
-        image: "prefecthq/server:${PREFECT_SERVER_TAG:-latest}"
+            - prefect_postgres
+
+    prefect_graphql:
+        image: "prefecthq/server:latest"
         ports:
-            - "${GRAPHQL_HOST_PORT:-4201}:4201"
+            - "4201:4201"
         command: bash -c "${PREFECT_SERVER_DB_CMD} && python src/prefect_server/services/graphql/server.py"
         environment:
             PREFECT_SERVER_DB_CMD: ${PREFECT_SERVER_DB_CMD:-"echo 'DATABASE MIGRATIONS SKIPPED'"}
             PREFECT_SERVER__DATABASE__CONNECTION_URL: ${DB_CONNECTION_URL}
             PREFECT_SERVER__HASURA__ADMIN_SECRET: ${PREFECT_SERVER__HASURA__ADMIN_SECRET:-hasura-secret-admin-secret}
-            PREFECT_SERVER__HASURA__HOST: hasura
+            PREFECT_SERVER__HASURA__HOST: prefect_hasura
         networks:
             - prefect-server
         restart: "always"
+        healthcheck:
+            test: curl --fail --silent "http://prefect_graphql:4201/health" &> /dev/null || exit 1
+            interval: 20s
+            timeout: 2s
+            retries: 60
+            start_period: 1s
         depends_on:
-            - hasura
-    
-    towel:
-        image: "prefecthq/server:${PREFECT_SERVER_TAG:-latest}"
+            - prefect_hasura
+
+    prefect_towel:
+        image: "prefecthq/server:latest"
         command: "python src/prefect_server/services/towel/__main__.py"
         environment:
             PREFECT_SERVER__HASURA__ADMIN_SECRET: ${PREFECT_SERVER__HASURA__ADMIN_SECRET:-hasura-secret-admin-secret}
-            PREFECT_SERVER__HASURA__HOST: hasura
+            PREFECT_SERVER__HASURA__HOST: prefect_hasura
         networks:
             - prefect-server
         restart: "always"
         depends_on:
-            - graphql
-    
-    apollo:
-        image: "prefecthq/apollo:${PREFECT_SERVER_TAG:-latest}"
-        ports:
-            - "${APOLLO_HOST_PORT:-4200}:4200"
+            - prefect_graphql
+
+    prefect_apollo:
+        image: "prefecthq/apollo:latest"
         command: bash -c "./post-start.sh && npm run serve"
+        ports:
+            - 4200:4200
         environment:
-            HASURA_API_URL: ${HASURA_API_URL:-http://hasura:3000/v1alpha1/graphql}
-            PREFECT_API_URL: ${PREFECT_API_URL:-http://graphql:4201/graphql/}
-            PREFECT_API_HEALTH_URL: ${PREFECT_API_HEALTH_URL:-http://graphql:4201/health}
-            PREFECT_SERVER__TELEMETRY__ENABLED: ${PREFECT_SERVER__TELEMETRY__ENABLED:-false}
-            GRAPHQL_SERVICE_HOST: http://graphql
-            GRAPHQL_SERVICE_PORT: ${GRAPHQL_HOST_PORT:-4201}
+            HASURA_API_URL: http://prefect_hasura:3000/v1alpha1/graphql
+            PREFECT_API_URL: http://prefect_graphql:4201/graphql/
+            PREFECT_API_HEALTH_URL: http://prefect_graphql:4201/health
+            PREFECT_SERVER__TELEMETRY__ENABLED: "false"
+            GRAPHQL_SERVICE_HOST: http://prefect_graphql
+            GRAPHQL_SERVICE_PORT: 4201
         networks:
             - prefect-server
         restart: "always"
+        healthcheck:
+            test: curl --fail --silent "http://prefect_apollo:4200/.well-known/apollo/server-health" &> /dev/null || exit 1
+            interval: 10s
+            timeout: 2s
+            retries: 60
+            start_period: 1s
         depends_on:
-            - graphql
-    
-    ui:
-        image: "prefecthq/ui:${PREFECT_UI_TAG:-latest}"
+            - prefect_graphql
+
+    prefect_ui:
+        image: "prefecthq/ui:2021-02-23"
         ports:
-            - "${UI_HOST_PORT:-8080}:8080"
+            - "8081:8080"
         command: "/intercept.sh"
         environment:
-            PREFECT_SERVER__APOLLO_URL: ${APOLLO_URL:-http://localhost:4200/graphql}
+            PREFECT_SERVER__APOLLO_URL: http://localhost:4200/graphql
+            PREFECT_BACKEND: server
         networks:
             - prefect-server
         restart: "always"
+        healthcheck:
+            test: curl --fail --silent --head "http://prefect_ui:8080/" &> /dev/null || exit 1
+            interval: 30s
+            timeout: 5s
+            retries: 3
         depends_on:
-            - apollo
+            - prefect_apollo
 
     es01:
         image: docker.elastic.co/elasticsearch/elasticsearch:7.12.0
@@ -120,17 +152,21 @@ services:
             xpack.security.http.ssl.certificate_authorities: /usr/share/elasticsearch/config/certificates/ca/ca.crt
             xpack.security.http.ssl.certificate: /usr/share/elasticsearch/config/certificates/es01/es01.crt
             xpack.security.transport.ssl.enabled: "true"
-            xpack.security.transport.ssl.verification_mode: certificate 
+            xpack.security.transport.ssl.verification_mode: certificate
             xpack.security.transport.ssl.certificate_authorities: /usr/share/elasticsearch/config/certificates/ca/ca.crt
             xpack.security.transport.ssl.certificate: /usr/share/elasticsearch/config/certificates/es01/es01.crt
             xpack.security.transport.ssl.key: /usr/share/elasticsearch/config/certificates/es01/es01.key
             cluster.routing.allocation.disk.threshold_enabled: "true"
             cluster.routing.allocation.disk.watermark.low: 93%
             cluster.routing.allocation.disk.watermark.high: 95%
+            http.cors.enabled : "true"
+            http.cors.allow-origin : "*"
+            http.cors.allow-methods : OPTIONS, HEAD, GET, POST, PUT, DELETE
+            http.cors.allow-headers : Authorization,X-Requested-With,X-Auth-Token,Content-Type, Content-Length
         depends_on:
             - es02
             - es03
-        ulimits: 
+        ulimits:
             memlock:
                 soft: 262144
                 hard: 500000
@@ -155,14 +191,14 @@ services:
             xpack.security.http.ssl.certificate_authorities: /usr/share/elasticsearch/config/certificates/ca/ca.crt
             xpack.security.http.ssl.certificate: /usr/share/elasticsearch/config/certificates/es02/es02.crt
             xpack.security.transport.ssl.enabled: "true"
-            xpack.security.transport.ssl.verification_mode: certificate 
+            xpack.security.transport.ssl.verification_mode: certificate
             xpack.security.transport.ssl.certificate_authorities: /usr/share/elasticsearch/config/certificates/ca/ca.crt
             xpack.security.transport.ssl.certificate: /usr/share/elasticsearch/config/certificates/es02/es02.crt
             xpack.security.transport.ssl.key: /usr/share/elasticsearch/config/certificates/es02/es02.key
             cluster.routing.allocation.disk.threshold_enabled: "true"
             cluster.routing.allocation.disk.watermark.low: 93%
             cluster.routing.allocation.disk.watermark.high: 95%
-        ulimits: 
+        ulimits:
             memlock:
                 soft: 262144
                 hard: 500000
@@ -187,14 +223,14 @@ services:
             xpack.security.http.ssl.certificate_authorities: /usr/share/elasticsearch/config/certificates/ca/ca.crt
             xpack.security.http.ssl.certificate: /usr/share/elasticsearch/config/certificates/es03/es03.crt
             xpack.security.transport.ssl.enabled: "true"
-            xpack.security.transport.ssl.verification_mode: certificate 
+            xpack.security.transport.ssl.verification_mode: certificate
             xpack.security.transport.ssl.certificate_authorities: /usr/share/elasticsearch/config/certificates/ca/ca.crt
             xpack.security.transport.ssl.certificate: /usr/share/elasticsearch/config/certificates/es03/es03.crt
             xpack.security.transport.ssl.key: /usr/share/elasticsearch/config/certificates/es03/es03.key
             cluster.routing.allocation.disk.threshold_enabled: "true"
             cluster.routing.allocation.disk.watermark.low: 93%
             cluster.routing.allocation.disk.watermark.high: 95%
-        ulimits: 
+        ulimits:
             memlock:
                 soft: 262144
                 hard: 500000
@@ -211,6 +247,29 @@ services:
             - "5601:5601"
         depends_on:
             - es01
+
+    # enterprise_search:
+    #     image: docker.elastic.co/enterprise-search/enterprise-search:7.12.0
+    #     environment:
+    #         JAVA_OPTS: "-Xms512m -Xmx512m"
+    #         ENT_SEARCH_DEFAULT_PASSWORD: elasticelastic
+    #         ent_search.external_url: "https://localhost:3002"
+    #         ent_search.auth.source: elasticsearch-native # elasticsearch-based users
+    #         ent_search.ssl.enabled: "true"
+    #         ent_search.ssl.keystore.path: "/usr/share/elasticsearch/config/certificates/enterprise_search/enterprise_search.p12"
+    #         ent_search.ssl.keystore.password: changeme
+    #         elasticsearch.username: elastic
+    #         elasticsearch.password: ${ELASTICSEARCH_PWD}
+    #         elasticsearch.host: "https://es01:9200"
+    #         elasticsearch.ssl.enabled: "true"
+    #         elasticsearch.ssl.certificate_authority: "/usr/share/elasticsearch/config/certificates/ca/ca.crt"
+    #         allow_es_settings_modification: "true"
+    #         secret_management.encryption_keys: "[elasticelastic]"
+    #         telemetry.enabled: "false"
+    #     volumes:
+    #         - "./certs:/usr/share/elasticsearch/config/certificates:ro"
+    #     ports:
+    #         - "3002:3002"
 
     # source : https://docs.min.io/docs/deploy-minio-on-docker-compose.html
     minio:

@@ -1,0 +1,44 @@
+{
+  "name": "pandemic-knowledge",
+  "version": "1.0.0",
+  "homepage": ".",
+  "dependencies": {
+    "@trendmicro/react-sidenav": "0.5.0",
+    "bootstrap": "^4.3.1",
+    "json-loader": "^0.5.7",
+    "react": "^16.11.0",
+    "react-bootstrap": "^1.0.0-beta.14",
+    "react-bootstrap-icons": "1.0.1-alpha3",
+    "react-click-outsider": "^1.1.1",
+    "react-cookie": "4.0.3",
+    "react-dom": "^16.11.0",
+    "react-highlight-words": "^0.17.0",
+    "react-loader-spinner": "3.1.14",
+    "react-notifications": "1.6.0",
+    "react-router-dom": "^5.1.2",
+    "react-scripts": "3.2.0",
+    "searchkit": "^2.4.4",
+    "styled-components": "^4.4.0"
+  },
+  "scripts": {
+    "start": "/app/node_modules/react-scripts/bin/react-scripts.js start",
+    "build": "/app/node_modules/react-scripts/bin/react-scripts.js build",
+    "test": "/app/node_modules/react-scripts/bin/react-scripts.js test",
+    "eject": "/app/node_modules/react-scripts/bin/react-scripts.js eject"
+  },
+  "eslintConfig": {
+    "extends": "react-app"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  }
+}

@@ -4,13 +4,11 @@ import uuid
 import requests
 import prefect
 import clevercsv
-import traceback
 from tqdm import tqdm
 from prefect import Flow, Task, Client, task
 from datetime import timedelta, datetime
 from prefect.schedules import IntervalSchedule
 from elasticsearch import Elasticsearch, helpers
-from geopy.geocoders import Nominatim
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 
@@ -27,23 +25,23 @@ ELASTIC_USER = os.environ.get("ELASTIC_USER")
 ELASTIC_PWD = os.environ.get("ELASTIC_PWD")
 ELASTIC_ENDPOINT = os.environ.get("ELASTIC_ENDPOINT")
 
-csv_endpoint = "https://raw.githubusercontent.com/opencovid19-fr/data/master/dist/chiffres-cles.csv"
-index_name = "contamination_opencovid19_fr"
-project_name = f"pandemic-knowledge-opencovid19-fr"
+csv_endpoint = "https://www.data.gouv.fr/en/datasets/r/406c6a23-e283-4300-9484-54e78c8ae675"
+project_name = f"pandemic-knowledge-santepublic-tests"
+index_name = "contamination_santepublique_vir_tests_fr"
 flow_name = project_name
 
 logger = prefect.context.get("logger")
 
 columns_allowed = {
-    "date": ["date"],
-    "location": ["maille_nom"],
-    "location_name": ["maille_nom"],
-    "cases": ["cas_confirmes"],
-    "confirmed": ["cas_confirmes"],
-    "deaths": ["deces"],
-    "recovered": ["gueris"],
+    "date": ["jour"],
+    "location": ["dep"],
+    "location_name": ["dep"],
+    "cases": [],
+    "confirmed": ["P"],
+    "deaths": [],
+    "recovered": [],
     "vaccinated": [],
-    "tested": ["depistes"],
+    "tested": ["T"],
 }
 
 extra_locations = {"EL": "GR"}
@@ -123,7 +121,7 @@ def format_row(lookup_table, row, headers, filename):
             "tested": int(float(nb_tested)) if nb_tested else 0,
             "filename": filename,
             "iso_code2": location[1] if location else None,
-            "iso_region2": str(row[2]).replace("DEP", "FR"),
+            "iso_region2": f"FR-{row[2]}",
         }
     logger.warning(f"format_row(): Invalid row : {row}")
     return None

@@ -107,7 +107,10 @@ There are several data source supported by Pandemic Knowledge
   - Format : CSV
 - [OpenCovid19-Fr](https://github.com/opencovid19-fr/data)
   - docker-compose slug : `insert_france`
-  - Format : CSV
+  - Format : CSV (download from Internet)
+- [Public Health France - Virological test results](https://www.data.gouv.fr/en/datasets/donnees-relatives-aux-resultats-des-tests-virologiques-covid-19/) (official source)
+  - docker-compose slug : `insert_france_virtests`
+  - Format : CSV (download from Internet)
 
 1. Start MinIO and import your files according to the buckets evoked upper.
 

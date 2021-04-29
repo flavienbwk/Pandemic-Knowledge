@@ -2,6 +2,30 @@ version: "3.7"
 
 services:
 
+  insert_france_virtests:
+    build: ./flow
+    command: python3 /usr/app/insert_france_virtests.py
+    volumes:
+      - /srv/docker/prefect/flows:/root/.prefect/flows
+      - "./flow/scripts:/usr/app:ro"
+      - type: bind
+        source: ./flow/config.toml
+        target: /root/.prefect/config.toml
+        read_only: true
+    env_file:
+      - .env
+    environment:
+      MINIO_SCHEME: ${MINIO_SCHEME}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      MAX_ES_ROW_INJECT: ${MAX_ES_ROW_INJECT}
+      ELASTIC_SCHEME: ${ELASTIC_SCHEME}
+      ELASTIC_PORT: ${ELASTIC_PORT}
+      ELASTIC_ENDPOINT: ${ELASTIC_ENDPOINT}
+      ELASTIC_USER: ${ELASTIC_USER}
+      ELASTIC_PWD: ${ELASTICSEARCH_PWD}
+
   insert_france:
     build: ./flow
     command: python3 /usr/app/insert_france.py

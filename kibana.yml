@@ -16,4 +16,4 @@ server.ssl.key: "/usr/share/elasticsearch/config/certificates/kibana/kibana.key"
 elasticsearch.ssl.certificateAuthorities: ["/usr/share/elasticsearch/config/certificates/ca/ca.crt"]
 
 # Enterprise Search
-enterpriseSearch.host: 'https://enterprise_search:3002'
+enterpriseSearch.host: 'http://enterprise_search:3002'

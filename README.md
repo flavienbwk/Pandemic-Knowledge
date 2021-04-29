@@ -1,12 +1,47 @@
 # Pandemic-Knowledge
 
-A fully-featured dashboard for extracting knowledge from Covid data.
+![Pandemic Knowledge logo](./pandemic_knowledge.png)
+
+<p align="center">
+    <a href="https://travis-ci.com/flavienbwk/Pandemic-Knowledge" target="_blank">
+        <img src="https://travis-ci.org/flavienbwk/Pandemic-Knowledge.svg?branch=develop"/>
+    </a>
+    <a href="https://github.com/psf/black"><img alt="Code style: black" src="https://img.shields.io/badge/code%20style-black-000000.svg"></a>
+    <a href="./LICENSE"><img atl="Repo license MIT" src="https://img.shields.io/badge/License-MIT-yellow.svg"/></a>
+</p>
+
+A fully-featured multi-source data pipeline for continuously extracting knowledge from COVID-19 data.
+
+- Contamination figures
+- Vaccination figures
+- Death figures
+- COVID-19-related news (Google News)
+
+## What you can achieve
+
+|                        Live contaminations map + Latest news                        |                   Last 7 days news                    |
+| :---------------------------------------------------------------------------------: | :---------------------------------------------------: |
+| ![Live contamination and vaccination world map](./illustrations/live_dashboard.png) | ![Last news, live !](./illustrations/latest_news.png) |
+
+|            France 3-weeks live map (Kibana Canvas)            |                     Live vaccinations map                     |
+| :-----------------------------------------------------------: | :-----------------------------------------------------------: |
+| ![France Live Status](./illustrations/france_live_status.png) | ![World vaccination map](./illustrations/vaccination_map.png) |
+
+## Context
+
+This project was realized over 4 days as part of a MSc hackathon from [ETNA](https://etna.io), a french computer science school.
+
+The incentives were both to experiment/prototype a big data pipeline and contribute to an open source project.
 
 ## Install
 
+Below, you'll find the procedure to process COVID-related file and news into the Pandemic Knowledge database (elasticsearch).
+
+The process is **scheduled** to run every 24 hours so you can update the files and obtain the latest news
+
 ### Initialize elasticsearch
 
-First, you will need to raise your host's ulimits for ElasticSearch to handle high I/O :
+Raise your host's ulimits for ElasticSearch to handle high I/O :
 
 ```bash
 sudo sysctl -w vm.max_map_count=500000
@@ -62,13 +97,7 @@ Access the web UI at [localhost:8081](http://localhost:8081)
 
 Agents are services that run your scheduled flows.
 
-Open and edit the [`agent/config.toml`](./agent/config.toml) file.
-
-> :information_source: In each `config.toml`, you will find the `172.17.0.1` IP address. This is the IP of the Docker daemon on which are exposed all exposed ports of your containers. This allows   containers on launched from different docker-compose networks to communicate. Change it if yours is different (check your daemon IP by typing `ip a | grep docker0`).
-> 
-> ![Docker interface IP](./docker_interface.png)
-> 
-> Here, mine is `192.168.254.1` but the default is generally to `172.17.0.1`.
+Open and optionally edit the [`agent/config.toml`](./agent/config.toml) file.
 
 Then you can run :
 
@@ -84,9 +113,11 @@ Maybe you want to instanciate multiple agents automatically ?
 docker-compose -f agent/docker-compose.yml up -d --build --scale agent=3 agent
 ```
 
-### Inject COVID-19 data
+### COVID-19 data
 
-#### Situation
+Injection scripts should are scheduled in Prefect so they automatically inject data with the latest news (delete + inject).
+
+#### Injecting data
 
 There are several data source supported by Pandemic Knowledge
 
@@ -96,37 +127,42 @@ There are several data source supported by Pandemic Knowledge
   - Format : CSV
 - [OpenCovid19-Fr](https://github.com/opencovid19-fr/data)
   - docker-compose slug : `insert_france`
-  - Format : CSV
+  - Format : CSV (download from Internet)
+- [Public Health France - Virological test results](https://www.data.gouv.fr/en/datasets/donnees-relatives-aux-resultats-des-tests-virologiques-covid-19/) (official source)
+  - docker-compose slug : `insert_france_virtests`
+  - Format : CSV (download from Internet)
 
-Start MinIO and import your files according to the buckets evoked upper :
+1. Start MinIO and import your files according to the buckets evoked upper.
 
-```bash
-docker-compose up -d minio
-```
+    For _Our World In Data_, create the `contamination-owid` bucket and import the CSV file inside.
 
-> MinIO is available at `localhost:9000`
+    ```bash
+    docker-compose up -d minio
+    ```
 
-Download dependencies and start the injection service of your choice. For instance :
+    > MinIO is available at `localhost:9000`
 
-```bash
-pip3 install -r ./flow/requirements.txt
-docker-compose -f insert.docker-compose.yml up --build insert_owid
-```
+2. Download dependencies and start the injection service of your choice. For instance :
 
-Once the flow registered, start it in the Prefect UI !
+    ```bash
+    pip3 install -r ./flow/requirements.txt
+    docker-compose -f insert.docker-compose.yml up --build insert_owid
+    ```
 
-On Kibana, create an index pattern `contamination_owid_*`
+3. In [Kibana](https://localhost:5601), create an index pattern `contamination_owid_*`
 
-Once executed, we recommend to adjust the number of replicas [in the DevTool](https://localhost:5601/app/dev_tools#/console) :
+4. Once injected, we recommend to adjust the number of replicas [in the DevTool](https://localhost:5601/app/dev_tools#/console) :
 
-```json
-PUT /contamination_owid_*/_settings
-{
-    "index" : {
-        "number_of_replicas" : "2"
+    ```json
+    PUT /contamination_owid_*/_settings
+    {
+        "index" : {
+            "number_of_replicas" : "2"
+        }
     }
-}
-```
+    ```
+
+5. Start making your dashboards in [Kibana](https://localhost:5601) !
 
 #### News
 
@@ -147,7 +183,8 @@ PUT /contamination_owid_*/_settings
 
 4. Create your visualisation
 
-### Useful commands
+<details>
+<summary>Useful commands</summary>
 
 To stop everything :
 
@@ -165,3 +202,5 @@ docker-compose up -d minio
 docker-compose up -d prefect_postgres prefect_hasura prefect_graphql prefect_towel prefect_apollo prefect_ui
 docker-compose -f agent/docker-compose.yml up -d --build --scale agent=3 agent
 ```
+
+</details>

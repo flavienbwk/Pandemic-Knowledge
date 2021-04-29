@@ -1,6 +1,10 @@
 version: "3.7"
 
 services:
+    prefect_setup:
+        build: ./prefect
+        networks:
+            - prefect-server
 
     prefect_postgres:
         image: "postgres:11"
@@ -24,7 +28,7 @@ services:
             # explicitly set max connections
             - "-c"
             - "max_connections=150"
-        
+
     prefect_hasura:
         image: "hasura/graphql-engine:v1.3.3"
         ports:
@@ -47,7 +51,7 @@ services:
             start_period: 1s
         depends_on:
             - prefect_postgres
-    
+
     prefect_graphql:
         image: "prefecthq/server:latest"
         ports:
@@ -69,7 +73,7 @@ services:
             start_period: 1s
         depends_on:
             - prefect_hasura
-    
+
     prefect_towel:
         image: "prefecthq/server:latest"
         command: "python src/prefect_server/services/towel/__main__.py"
@@ -81,7 +85,7 @@ services:
         restart: "always"
         depends_on:
             - prefect_graphql
-    
+
     prefect_apollo:
         image: "prefecthq/apollo:latest"
         command: bash -c "./post-start.sh && npm run serve"
@@ -105,7 +109,7 @@ services:
             start_period: 1s
         depends_on:
             - prefect_graphql
-    
+
     prefect_ui:
         image: "prefecthq/ui:2021-02-23"
         ports:
@@ -148,21 +152,21 @@ services:
             xpack.security.http.ssl.certificate_authorities: /usr/share/elasticsearch/config/certificates/ca/ca.crt
             xpack.security.http.ssl.certificate: /usr/share/elasticsearch/config/certificates/es01/es01.crt
             xpack.security.transport.ssl.enabled: "true"
-            xpack.security.transport.ssl.verification_mode: certificate 
+            xpack.security.transport.ssl.verification_mode: certificate
             xpack.security.transport.ssl.certificate_authorities: /usr/share/elasticsearch/config/certificates/ca/ca.crt
             xpack.security.transport.ssl.certificate: /usr/share/elasticsearch/config/certificates/es01/es01.crt
             xpack.security.transport.ssl.key: /usr/share/elasticsearch/config/certificates/es01/es01.key
             cluster.routing.allocation.disk.threshold_enabled: "true"
             cluster.routing.allocation.disk.watermark.low: 93%
             cluster.routing.allocation.disk.watermark.high: 95%
-            http.cors.enabled : "true"  
+            http.cors.enabled : "true"
             http.cors.allow-origin : "*"
             http.cors.allow-methods : OPTIONS, HEAD, GET, POST, PUT, DELETE
             http.cors.allow-headers : Authorization,X-Requested-With,X-Auth-Token,Content-Type, Content-Length
         depends_on:
             - es02
             - es03
-        ulimits: 
+        ulimits:
             memlock:
                 soft: 262144
                 hard: 500000
@@ -187,14 +191,14 @@ services:
             xpack.security.http.ssl.certificate_authorities: /usr/share/elasticsearch/config/certificates/ca/ca.crt
             xpack.security.http.ssl.certificate: /usr/share/elasticsearch/config/certificates/es02/es02.crt
             xpack.security.transport.ssl.enabled: "true"
-            xpack.security.transport.ssl.verification_mode: certificate 
+            xpack.security.transport.ssl.verification_mode: certificate
             xpack.security.transport.ssl.certificate_authorities: /usr/share/elasticsearch/config/certificates/ca/ca.crt
             xpack.security.transport.ssl.certificate: /usr/share/elasticsearch/config/certificates/es02/es02.crt
             xpack.security.transport.ssl.key: /usr/share/elasticsearch/config/certificates/es02/es02.key
             cluster.routing.allocation.disk.threshold_enabled: "true"
             cluster.routing.allocation.disk.watermark.low: 93%
             cluster.routing.allocation.disk.watermark.high: 95%
-        ulimits: 
+        ulimits:
             memlock:
                 soft: 262144
                 hard: 500000
@@ -219,14 +223,14 @@ services:
             xpack.security.http.ssl.certificate_authorities: /usr/share/elasticsearch/config/certificates/ca/ca.crt
             xpack.security.http.ssl.certificate: /usr/share/elasticsearch/config/certificates/es03/es03.crt
             xpack.security.transport.ssl.enabled: "true"
-            xpack.security.transport.ssl.verification_mode: certificate 
+            xpack.security.transport.ssl.verification_mode: certificate
             xpack.security.transport.ssl.certificate_authorities: /usr/share/elasticsearch/config/certificates/ca/ca.crt
             xpack.security.transport.ssl.certificate: /usr/share/elasticsearch/config/certificates/es03/es03.crt
             xpack.security.transport.ssl.key: /usr/share/elasticsearch/config/certificates/es03/es03.key
             cluster.routing.allocation.disk.threshold_enabled: "true"
             cluster.routing.allocation.disk.watermark.low: 93%
             cluster.routing.allocation.disk.watermark.high: 95%
-        ulimits: 
+        ulimits:
             memlock:
                 soft: 262144
                 hard: 500000

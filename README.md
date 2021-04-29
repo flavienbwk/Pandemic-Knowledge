@@ -11,11 +11,11 @@ A fully-featured dashboard and data pipeline for extracting knowledge from COVID
 
 ## What can be done
 
-|                      Live contaminations and vaccinations map                       |                  Latest news (24h)                  |
-| :---------------------------------------------------------------------------------: | :-------------------------------------------------: |
-| ![Live contamination and vaccination world map](./illustrations/live_dashboard.png) | ![Last news, live !](./illustrations/last_news.png) |
+|                        Live contaminations map + Latest news                        |                   Last 7 days news                    |
+| :---------------------------------------------------------------------------------: | :---------------------------------------------------: |
+| ![Live contamination and vaccination world map](./illustrations/live_dashboard.png) | ![Last news, live !](./illustrations/latest_news.png) |
 
-|                    France 3-weeks live map                    |                     World vaccination map                     |
+|            France 3-weeks live map (Kibana Canvas)            |                     Live vaccinations map                     |
 | :-----------------------------------------------------------: | :-----------------------------------------------------------: |
 | ![France Live Status](./illustrations/france_live_status.png) | ![World vaccination map](./illustrations/vaccination_map.png) |
 

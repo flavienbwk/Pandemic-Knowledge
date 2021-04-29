@@ -15,6 +15,10 @@ A fully-featured dashboard and data pipeline for extracting knowledge from COVID
 | :---------------------------------------------------------------------------------: | :-------------------------------------------------: |
 | ![Live contamination and vaccination world map](./illustrations/live_dashboard.png) | ![Last news, live !](./illustrations/last_news.png) |
 
+|                    France 3-weeks live map                    |                     World vaccination map                     |
+| :-----------------------------------------------------------: | :-----------------------------------------------------------: |
+| ![France Live Status](./illustrations/france_live_status.png) | ![World vaccination map](./illustrations/vaccination_map.png) |
+
 ## Install
 
 Below, you'll find the procedure to process COVID-related file and news into the Pandemic Knowledge database (elasticsearch).

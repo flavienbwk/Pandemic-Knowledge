@@ -43,7 +43,7 @@ The process is **scheduled** to run every 24 hours so you can update the files a
   - [What you can achieve](#what-you-can-achieve)
   - [Context](#context)
   - [Install](#install)
-    - [Copy env file](#copy-env-file)
+    - [Env file](#env-file)
     - [Initialize elasticsearch](#initialize-elasticsearch)
     - [Initialize Prefect](#initialize-prefect)
     - [Run Prefect workers](#run-prefect-workers)
@@ -52,11 +52,15 @@ The process is **scheduled** to run every 24 hours so you can update the files a
       - [News](#news)
     - [News web app](#news-web-app)
 
-### Copy env file
+### Env file
+
+Running this project on your local computer ? Just copy the `.env.example` file :
 
 ```bash
 cp .env.example .env
 ```
+
+Open this `.env` file and edit password-related variables.
 
 ### Initialize elasticsearch
 

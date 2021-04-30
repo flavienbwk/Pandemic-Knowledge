@@ -180,7 +180,7 @@ There are several data source supported by Pandemic Knowledge
 There are two sources for news :
 
 - Google News (elasticsearch index: `news_googlenews`)
-- Tweeter (elasticsearch index: `news_tweeter`)
+- Twitter (elasticsearch index: `news_tweets`)
 
 1. Run the Google News crawler :
 
@@ -223,7 +223,8 @@ Browse through the news with our web application.
 Possible improvements :
 
 - [ ] [Using Dask for parallelizing](https://docs.prefect.io/core/idioms/parallel.html) process of CSV lines by batch of 1000
-- [ ] Removing indices only when source process successfuly worked (adding new index, then remove old index)
+- [ ] Removing indices only when source process is successful (adding new index, then remove old index)
+- [ ] Removing indices only when crawling is successful (adding new index, then remove old index)
 
 </details>
 

@@ -223,7 +223,7 @@ Possible improvements :
 - [ ] Using Dask for parallelizing process of CSV lines by batch of 1000
 - [ ] Removing indices only when source process successfuly worked (adding new index, then remove old index)
 
-</summary>
+</details>
 
 <details>
 <summary>Useful commands</summary>

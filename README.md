@@ -15,7 +15,7 @@ A fully-featured multi-source data pipeline for continuously extracting knowledg
 - Contamination figures
 - Vaccination figures
 - Death figures
-- COVID-19-related news (Google News)
+- COVID-19-related news (Google News, Twitter)
 
 ## What you can achieve
 
@@ -48,8 +48,7 @@ The process is **scheduled** to run every 24 hours so you can update the files a
     - [Initialize Prefect](#initialize-prefect)
     - [Run Prefect workers](#run-prefect-workers)
     - [COVID-19 data](#covid-19-data)
-      - [Injecting data](#injecting-data)
-      - [News](#news)
+    - [News data](#news-data)
     - [News web app](#news-web-app)
 
 ### Env file
@@ -131,8 +130,6 @@ Agents are services that run your scheduled flows.
 
 Injection scripts should are scheduled in Prefect so they automatically inject data with the latest news (delete + inject).
 
-#### Injecting data
-
 There are several data source supported by Pandemic Knowledge
 
 - [Our World In Data](https://ourworldindata.org/coronavirus-data); used by Google
@@ -178,12 +175,17 @@ There are several data source supported by Pandemic Knowledge
 
 5. Start making your dashboards in [Kibana](https://localhost:5601) !
 
-#### News
+### News data
+
+There are two sources for news :
+
+- Google News (elasticsearch index: `news_googlenews`)
+- Twitter (elasticsearch index: `news_tweets`)
 
 1. Run the Google News crawler :
 
   ```bash
-  docker-compose -f crawl.docker-compose.yml up --build
+  docker-compose -f crawl.docker-compose.yml up --build crawl_google_news # and/or crawl_tweets
   ```
 
 2. In Kibana, create a `news_*` index pattern
@@ -220,10 +222,11 @@ Browse through the news with our web application.
 
 Possible improvements :
 
-- [ ] Using Dask for parallelizing process of CSV lines by batch of 1000
-- [ ] Removing indices only when source process successfuly worked (adding new index, then remove old index)
+- [ ] [Using Dask for parallelizing](https://docs.prefect.io/core/idioms/parallel.html) process of CSV lines by batch of 1000
+- [ ] Removing indices only when source process is successful (adding new index, then remove old index)
+- [ ] Removing indices only when crawling is successful (adding new index, then remove old index)
 
-</summary>
+</details>
 
 <details>
 <summary>Useful commands</summary>

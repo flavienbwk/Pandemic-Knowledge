@@ -6,9 +6,15 @@ import prefect
 from elasticsearch import Elasticsearch, helpers
 from prefect import Flow, Task, Client
 from datetime import timedelta, datetime
+
 from prefect.schedules import IntervalSchedule
 from GoogleNews import GoogleNews
 
+from crawl_mapping import mapping
+
+
+project_name = "pandemic-knowledge-crawl-googlenews"
+index_name = "news_googlenews"
 
 MAX_ES_ROW_INJECT = int(os.environ.get("MAX_ES_ROW_INJECT", 1000))
 ELASTIC_SCHEME = os.environ.get("ELASTIC_SCHEME")
@@ -19,23 +25,9 @@ ELASTIC_ENDPOINT = os.environ.get("ELASTIC_ENDPOINT")
 
 logger = prefect.context.get("logger")
 
-mapping = {
-    "mappings": {
-        "properties": {
-            "title": {"type": "text", "fields": {"keyword": {"type": "keyword"}}},
-            "desc": {"type": "text"},
-            "date": {
-                "type": "date",
-                "format": "strict_date_optional_time||epoch_millis",
-            },
-            "link": {"type": "text", "fields": {"keyword": {"type": "keyword"}}},
-            "img": {"type": "text"},
-            "media": {"type": "text"},
-            "site": {"type": "text"},
-            "lang": {"type": "text", "fields": {"keyword": {"type": "keyword"}}},
-        }
-    }
-}
+schedule = IntervalSchedule(
+    start_date=datetime.utcnow() + timedelta(seconds=1), interval=timedelta(hours=24)
+)
 
 
 def get_es_instance():
@@ -69,7 +61,9 @@ def format_new(new: dict, lang: str) -> dict:
             "desc": str(new["desc"]),
             "img": str(new["img"]),
             "link": "https://" + str(new["link"]),
-            "site": str(new["site"]),
+            "source.crawler": "Google News",
+            "source.website": str(new["site"]),
+            "source.url": str(new["link"]),
             "date": new["datetime"],
             "lang": lang,
         }
@@ -140,11 +134,7 @@ class GenerateEsMapping(Task):
                 raise Exception("Unable to create index mapping")
 
 
-schedule = IntervalSchedule(
-    start_date=datetime.utcnow() + timedelta(seconds=1), interval=timedelta(hours=24)
-)
 with Flow("Crawl news and insert", schedule=schedule) as flow:
-    index_name = "news_googlenews"
     flow.set_dependencies(
         upstream_tasks=[GenerateEsMapping(index_name)],
         task=GetNews(),
@@ -154,12 +144,12 @@ with Flow("Crawl news and insert", schedule=schedule) as flow:
 if __name__ == "__main__":
     try:
         client = Client()
-        client.create_project(project_name="pandemic-knowledge-crawl-googlenews")
+        client.create_project(project_name=project_name)
     except prefect.utilities.exceptions.ClientError as e:
         logger.info("Project already exists")
 
     flow.register(
-        project_name="pandemic-knowledge-crawl-googlenews",
+        project_name=project_name,
         labels=["development"],
         add_default_labels=False,
     )

@@ -10,12 +10,14 @@ from iso3166 import countries
 from prefect import Flow, Task, Client
 from datetime import datetime
 from datetime import date, timedelta
+from prefect.schedules import IntervalSchedule
 
 import snscrape.modules.twitter as sntwitter
 import pandas
 
-index = "tweets"
-name = "pandemic-knowledge-crawl-tweets"
+index_name = "tweets"
+project_name = "pandemic-knowledge-crawl-tweets"
+
 tweet_limit = 100
 
 MAX_ES_ROW_INJECT = int(os.environ.get("MAX_ES_ROW_INJECT", 1000))
@@ -30,13 +32,20 @@ logger = prefect.context.get("logger")
 mapping = {
     "mappings": {
         "properties": {
-            "date": {"type": "text"},
-            "tweet_id": {"type": "text"},
-            "content": {"type": "text"},
-            "username": {"type": "text"},
+            "date": {
+                "type": "date",
+                "format": "strict_date_optional_time||epoch_millis",
+            },,
+            "tweet_id": {"type": "text", "fields": {"keyword": {"type": "keyword"}}},,
+            "content": {"type": "text", "fields": {"keyword": {"type": "keyword"}}},,
+            "username": {"type": "text", "fields": {"keyword": {"type": "keyword"}}},,
         }
     }
 }
+
+schedule = IntervalSchedule(
+    start_date=datetime.utcnow() + timedelta(seconds=1), interval=timedelta(hours=24)
+)
 
 def get_es_instance():
     es_inst = Elasticsearch(
@@ -108,19 +117,22 @@ class GenerateEsMapping(Task):
                 logger.error("Error type: {}".format(response['error']['type']))
                 raise Exception("Unable to create index mapping")
 
+with Flow("Crawl tweets and insert", schedule=schedule) as flow:
+    flow.set_dependencies(
+        upstream_tasks=[GenerateEsMapping(index_name)],
+        task=GetTweets(),
+        keyword_tasks=dict(index_name=index_name)
+    )
 
 if __name__ == "__main__":
-    with Flow("Search tweets and insert") as flow:
-        flow.set_dependencies(
-            task=GetTweets(),
-            upstream_tasks=[GenerateEsMapping(index)],
-            keyword_tasks=dict(index_name=index))
-
     try:
         client = Client()
-        client.create_project(project_name=name)
+        client.create_project(project_name=project_name)
     except prefect.utilities.exceptions.ClientError as e:
         logger.info("Project already exists")
 
-    flow.register(project_name=name, labels=["development"])
-    flow.run()
+    flow.register(
+        project_name=project_name,
+        labels=["development"],
+         add_default_labels=False,
+    )

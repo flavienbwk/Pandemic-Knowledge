@@ -216,7 +216,7 @@ Browse through the news with our web application.
 ---
 
 <details>
-<summary>Useful commands</summary>
+<summary>TODOs</summary>
 
 Possible improvements :
 

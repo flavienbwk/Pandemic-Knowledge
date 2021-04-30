@@ -6,14 +6,17 @@ from elasticsearch import Elasticsearch, helpers
 from prefect import Flow, Task, Client
 from datetime import datetime
 from datetime import timedelta
-from prefect.schedules import IntervalSchedule
 
+from prefect.schedules import IntervalSchedule
 import snscrape.modules.twitter as sntwitter
+
+from crawl_mapping import mapping
 
 project_name = "pandemic-knowledge-crawl-tweets"
 index_name = "news_tweets"
 
-tweet_limit = 100
+lang = "en"
+tweet_limit = 2
 
 MAX_ES_ROW_INJECT = int(os.environ.get("MAX_ES_ROW_INJECT", 1000))
 ELASTIC_SCHEME = os.environ.get("ELASTIC_SCHEME")
@@ -23,20 +26,6 @@ ELASTIC_PWD = os.environ.get("ELASTIC_PWD")
 ELASTIC_ENDPOINT = os.environ.get("ELASTIC_ENDPOINT")
 
 logger = prefect.context.get("logger")
-
-mapping = {
-    "mappings": {
-        "properties": {
-            "date": {
-                "type": "date",
-                "format": "strict_date_optional_time||epoch_millis",
-            },
-            "tweet_id": {"type": "text", "fields": {"keyword": {"type": "keyword"}}},
-            "content": {"type": "text", "fields": {"keyword": {"type": "keyword"}}},
-            "username": {"type": "text", "fields": {"keyword": {"type": "keyword"}}},
-        }
-    }
-}
 
 schedule = IntervalSchedule(
     start_date=datetime.utcnow() + timedelta(seconds=1), interval=timedelta(hours=24)
@@ -70,16 +59,24 @@ class GetTweets(Task):
     def run(self, index_name):
         tweets_from = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
         to_inject = []
-        tweets = sntwitter.TwitterSearchScraper(f"covid since:{tweets_from}").get_items()
+        tweets = sntwitter.TwitterSearchScraper(
+            f"covid since:{tweets_from} lang:{lang}"
+        ).get_items()
         for i, tweet in enumerate(tweets):
             if i > tweet_limit:
                 break
             to_inject.append(
                 {
+                    "title": f"Tweet from {tweet.username} the {tweet.date}",
+                    "desc": tweet.content,
                     "date": tweet.date,
-                    "tweet_id": tweet.id,
-                    "content": tweet.content,
-                    "username": tweet.username,
+                    "link": tweet.url,
+                    "source.crawler": "twitter",
+                    "source.website": "https://twitter.com",
+                    "source.author": tweet.username,
+                    "source.url": tweet.url,
+                    "source.tweet.id": tweet.id,
+                    "lang": lang
                 }
             )
         if len(to_inject) > 0:
@@ -126,8 +123,9 @@ if __name__ == "__main__":
     except prefect.utilities.exceptions.ClientError as e:
         logger.info("Project already exists")
 
-    flow.register(
-        project_name=project_name,
-        labels=["development"],
-        add_default_labels=False,
-    )
+    # flow.register(
+    #     project_name=project_name,
+    #     labels=["development"],
+    #     add_default_labels=False,
+    # )
+    flow.run()

@@ -6,8 +6,11 @@ import prefect
 from elasticsearch import Elasticsearch, helpers
 from prefect import Flow, Task, Client
 from datetime import timedelta, datetime
+
 from prefect.schedules import IntervalSchedule
 from GoogleNews import GoogleNews
+
+from crawl_mapping import mapping
 
 
 project_name = "pandemic-knowledge-crawl-googlenews"
@@ -21,24 +24,6 @@ ELASTIC_PWD = os.environ.get("ELASTIC_PWD")
 ELASTIC_ENDPOINT = os.environ.get("ELASTIC_ENDPOINT")
 
 logger = prefect.context.get("logger")
-
-mapping = {
-    "mappings": {
-        "properties": {
-            "title": {"type": "text", "fields": {"keyword": {"type": "keyword"}}},
-            "desc": {"type": "text"},
-            "date": {
-                "type": "date",
-                "format": "strict_date_optional_time||epoch_millis",
-            },
-            "link": {"type": "text", "fields": {"keyword": {"type": "keyword"}}},
-            "img": {"type": "text"},
-            "media": {"type": "text"},
-            "site": {"type": "text"},
-            "lang": {"type": "text", "fields": {"keyword": {"type": "keyword"}}},
-        }
-    }
-}
 
 schedule = IntervalSchedule(
     start_date=datetime.utcnow() + timedelta(seconds=1), interval=timedelta(hours=24)
@@ -76,7 +61,9 @@ def format_new(new: dict, lang: str) -> dict:
             "desc": str(new["desc"]),
             "img": str(new["img"]),
             "link": "https://" + str(new["link"]),
-            "site": str(new["site"]),
+            "source.crawler": "Google News",
+            "source.website": str(new["site"]),
+            "source.url": str(new["link"]),
             "date": new["datetime"],
             "lang": lang,
         }

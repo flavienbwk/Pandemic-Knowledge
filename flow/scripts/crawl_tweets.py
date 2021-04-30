@@ -16,7 +16,7 @@ project_name = "pandemic-knowledge-crawl-tweets"
 index_name = "news_tweets"
 
 lang = "en"
-tweet_limit = 2
+tweet_limit = 1000
 
 MAX_ES_ROW_INJECT = int(os.environ.get("MAX_ES_ROW_INJECT", 1000))
 ELASTIC_SCHEME = os.environ.get("ELASTIC_SCHEME")

@@ -24,7 +24,7 @@ services:
 
   crawl_tweets: 
     build: ./flow
-    command: python3 /usr/app/crawl_tweet.py
+    command: python3 /usr/app/crawl_tweets.py
     volumes:
       - /srv/docker/prefect/flows:/root/.prefect/flows
       - "./flow/scripts:/usr/app:ro"

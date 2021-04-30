@@ -1,4 +1,4 @@
-FROM python:3.7 as python37
+FROM python:3.7
 
 RUN apt update
 RUN pip install --upgrade pip

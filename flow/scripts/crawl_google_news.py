@@ -44,6 +44,7 @@ schedule = IntervalSchedule(
     start_date=datetime.utcnow() + timedelta(seconds=1), interval=timedelta(hours=24)
 )
 
+
 def get_es_instance():
     es_inst = Elasticsearch(
         [ELASTIC_ENDPOINT],

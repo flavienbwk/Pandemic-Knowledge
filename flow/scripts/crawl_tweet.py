@@ -1,4 +1,4 @@
-#python3
+# python3
 import os
 import json
 import uuid
@@ -9,14 +9,13 @@ from geopy.geocoders import Nominatim
 from iso3166 import countries
 from prefect import Flow, Task, Client
 from datetime import datetime
-from datetime import date, timedelta
+from datetime import timedelta
 from prefect.schedules import IntervalSchedule
 
 import snscrape.modules.twitter as sntwitter
-import pandas
 
-index_name = "tweets"
 project_name = "pandemic-knowledge-crawl-tweets"
+index_name = "news_tweets"
 
 tweet_limit = 100
 
@@ -35,10 +34,10 @@ mapping = {
             "date": {
                 "type": "date",
                 "format": "strict_date_optional_time||epoch_millis",
-            },,
-            "tweet_id": {"type": "text", "fields": {"keyword": {"type": "keyword"}}},,
-            "content": {"type": "text", "fields": {"keyword": {"type": "keyword"}}},,
-            "username": {"type": "text", "fields": {"keyword": {"type": "keyword"}}},,
+            },
+            "tweet_id": {"type": "text", "fields": {"keyword": {"type": "keyword"}}},
+            "content": {"type": "text", "fields": {"keyword": {"type": "keyword"}}},
+            "username": {"type": "text", "fields": {"keyword": {"type": "keyword"}}},
         }
     }
 }
@@ -47,15 +46,17 @@ schedule = IntervalSchedule(
     start_date=datetime.utcnow() + timedelta(seconds=1), interval=timedelta(hours=24)
 )
 
+
 def get_es_instance():
     es_inst = Elasticsearch(
         [ELASTIC_ENDPOINT],
         http_auth=(ELASTIC_USER, ELASTIC_PWD),
         scheme=ELASTIC_SCHEME,
         port=ELASTIC_PORT,
-        verify_certs=False
+        verify_certs=False,
     )
     return es_inst
+
 
 def inject_rows_to_es(rows, index_name):
     es_inst = get_es_instance()
@@ -63,32 +64,32 @@ def inject_rows_to_es(rows, index_name):
     logger.info("Injecting {} rows in Elasticsearch".format(len(rows)))
 
     actions = [
-        {
-            "_index": index_name,
-            "_id": uuid.uuid4(),
-            "_source": row
-        }
-        for row in rows
+        {"_index": index_name, "_id": uuid.uuid4(), "_source": row} for row in rows
     ]
 
     helpers.bulk(es_inst, actions)
 
+
 class GetTweets(Task):
     def run(self, index_name):
-        d = datetime.now() - timedelta(days=1)
-        limit = d.strftime("%y-%m-%d")
+        tweets_from = (datetime.now() - timedelta(days=1)).strftime("%y-%m-%d")
         to_inject = []
-        for i,tweet in enumerate(sntwitter.TwitterSearchScraper("covid since:" + limit).get_items()):
+        for i, tweet in enumerate(
+            sntwitter.TwitterSearchScraper("covid since:" + tweets_from).get_items()
+        ):
             if i > tweet_limit:
                 break
-            to_inject.append({
-                "date": tweet.date,
-                "tweet_id": tweet.id,
-                "content": tweet.content,
-                "username": tweet.username
-                })
+            to_inject.append(
+                {
+                    "date": tweet.date,
+                    "tweet_id": tweet.id,
+                    "content": tweet.content,
+                    "username": tweet.username,
+                }
+            )
         if len(to_inject) > 0:
             inject_rows_to_es(to_inject, index_name)
+
 
 class GenerateEsMapping(Task):
     def __init__(self, index_name, **kwargs):
@@ -103,25 +104,24 @@ class GenerateEsMapping(Task):
 
         es_inst.indices.delete(index=index_name, ignore=[400, 404])
 
-        response = es_inst.indices.create(
-            index=index_name,
-            body=mapping,
-            ignore=400
-        )
+        response = es_inst.indices.create(index=index_name, body=mapping, ignore=400)
 
-        if 'acknowledged' in response:
-            if response['acknowledged'] == True:
-                logger.info("INDEX MAPPING SUCCESS FOR INDEX: {}".format(response['index']))
-            elif 'error' in response:
-                logger.error(response['error']['root_cause'])
-                logger.error("Error type: {}".format(response['error']['type']))
+        if "acknowledged" in response:
+            if response["acknowledged"] == True:
+                logger.info(
+                    "INDEX MAPPING SUCCESS FOR INDEX: {}".format(response["index"])
+                )
+            elif "error" in response:
+                logger.error(response["error"]["root_cause"])
+                logger.error("Error type: {}".format(response["error"]["type"]))
                 raise Exception("Unable to create index mapping")
+
 
 with Flow("Crawl tweets and insert", schedule=schedule) as flow:
     flow.set_dependencies(
         upstream_tasks=[GenerateEsMapping(index_name)],
         task=GetTweets(),
-        keyword_tasks=dict(index_name=index_name)
+        keyword_tasks=dict(index_name=index_name),
     )
 
 if __name__ == "__main__":
@@ -134,5 +134,5 @@ if __name__ == "__main__":
     flow.register(
         project_name=project_name,
         labels=["development"],
-         add_default_labels=False,
+        add_default_labels=False,
     )

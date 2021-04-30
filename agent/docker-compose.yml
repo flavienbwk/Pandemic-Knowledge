@@ -3,6 +3,7 @@ version: "3.7"
 services:
 
     agent:
+        restart: always
         build: .
         dns: 8.8.8.8
         command: bash -c "prefect agent local start --name $$(uuid) --no-hostname-label --label development"

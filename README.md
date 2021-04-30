@@ -218,6 +218,15 @@ Browse through the news with our web application.
 <details>
 <summary>Useful commands</summary>
 
+Possible improvements :
+
+- [ ] Using Dask for parallelizing process of CSV lines by batch of 1000
+
+</summary>
+
+<details>
+<summary>Useful commands</summary>
+
 To stop everything :
 
 ```bash

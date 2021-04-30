@@ -221,6 +221,7 @@ Browse through the news with our web application.
 Possible improvements :
 
 - [ ] Using Dask for parallelizing process of CSV lines by batch of 1000
+- [ ] Removing indices only when source process successfuly worked (adding new index, then remove old index)
 
 </summary>
 

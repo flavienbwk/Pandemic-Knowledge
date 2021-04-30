@@ -25,7 +25,7 @@ ELASTIC_USER = os.environ.get("ELASTIC_USER")
 ELASTIC_PWD = os.environ.get("ELASTIC_PWD")
 ELASTIC_ENDPOINT = os.environ.get("ELASTIC_ENDPOINT")
 
-csv_endpoint = "https://static.data.gouv.fr/resources/donnees-relatives-aux-resultats-des-tests-virologiques-covid-19/20210428-190945/sp-pos-quot-dep-2021-04-28-19h09.csv"
+csv_endpoint = "https://www.data.gouv.fr/en/datasets/r/406c6a23-e283-4300-9484-54e78c8ae675"
 project_name = f"pandemic-knowledge-santepublic-tests"
 index_name = "contamination_santepublique_vir_tests_fr"
 flow_name = project_name

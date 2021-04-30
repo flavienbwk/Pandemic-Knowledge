@@ -3,7 +3,10 @@ version: "3.7"
 services:
 
   insert_france_virtests:
-    build: ./flow
+    build:
+      context: ./flow
+      dockerfile: Dockerfile
+      target: python37
     command: python3 /usr/app/insert_france_virtests.py
     volumes:
       - /srv/docker/prefect/flows:/root/.prefect/flows
@@ -27,7 +30,10 @@ services:
       ELASTIC_PWD: ${ELASTICSEARCH_PWD}
 
   insert_france:
-    build: ./flow
+    build:
+      context: ./flow
+      dockerfile: Dockerfile
+      target: python37
     command: python3 /usr/app/insert_france.py
     volumes:
       - /srv/docker/prefect/flows:/root/.prefect/flows
@@ -51,7 +57,10 @@ services:
       ELASTIC_PWD: ${ELASTICSEARCH_PWD}
 
   insert_owid:
-    build: ./flow
+    build:
+      context: ./flow
+      dockerfile: Dockerfile
+      target: python37
     command: python3 /usr/app/insert_owid.py
     volumes:
       - /srv/docker/prefect/flows:/root/.prefect/flows
@@ -75,7 +84,10 @@ services:
       ELASTIC_PWD: ${ELASTICSEARCH_PWD}
 
   parse_insert:
-    build: ./flow
+    build:
+      context: ./flow
+      dockerfile: Dockerfile
+      target: python37
     command: python3 /usr/app/parse_insert.py
     volumes:
       - /srv/docker/prefect/flows:/root/.prefect/flows

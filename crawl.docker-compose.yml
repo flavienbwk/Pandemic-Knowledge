@@ -22,9 +22,9 @@ services:
       ELASTIC_USER: ${ELASTIC_USER}
       ELASTIC_PWD: ${ELASTICSEARCH_PWD}
 
-  crawl_tweets:
+  crawl_tweets: 
     build: ./flow
-    command: python3 /usr/app/crawl_google_news.py
+    command: python3 /usr/app/crawl_tweet.py
     volumes:
       - /srv/docker/prefect/flows:/root/.prefect/flows
       - "./flow/scripts:/usr/app:ro"

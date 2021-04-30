@@ -7,3 +7,5 @@ geopy==2.1.0
 iso3166==1.0.1
 dateparser==1.0.0
 GoogleNews==1.5.7
+snscrape==0.3.4
+pandas==1.2.4

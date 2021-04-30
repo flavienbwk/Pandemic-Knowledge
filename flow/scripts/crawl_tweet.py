@@ -1,12 +1,8 @@
 # python3
 import os
-import json
 import uuid
 import prefect
 from elasticsearch import Elasticsearch, helpers
-from ssl import create_default_context
-from geopy.geocoders import Nominatim
-from iso3166 import countries
 from prefect import Flow, Task, Client
 from datetime import datetime
 from datetime import timedelta
@@ -72,11 +68,10 @@ def inject_rows_to_es(rows, index_name):
 
 class GetTweets(Task):
     def run(self, index_name):
-        tweets_from = (datetime.now() - timedelta(days=1)).strftime("%y-%m-%d")
+        tweets_from = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
         to_inject = []
-        for i, tweet in enumerate(
-            sntwitter.TwitterSearchScraper("covid since:" + tweets_from).get_items()
-        ):
+        tweets = sntwitter.TwitterSearchScraper(f"covid since:{tweets_from}").get_items()
+        for i, tweet in enumerate(tweets):
             if i > tweet_limit:
                 break
             to_inject.append(

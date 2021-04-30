@@ -65,6 +65,9 @@ class GetTweets(Task):
         for i, tweet in enumerate(tweets):
             if i > tweet_limit:
                 break
+            if i % 100 == 0:
+                inject_rows_to_es(to_inject, index_name)
+                to_inject = []
             to_inject.append(
                 {
                     "title": f"Tweet from {tweet.username} the {tweet.date}",
@@ -79,7 +82,7 @@ class GetTweets(Task):
                     "lang": lang
                 }
             )
-        if len(to_inject) > 0:
+        if len(to_inject):
             inject_rows_to_es(to_inject, index_name)
 
 

@@ -3,13 +3,11 @@ version: "3.7"
 services:
     prefect_setup:
         build: ./prefect
-        tty: true
         networks:
             - prefect-server
-        ports:
-            - 8080:8080
 
     prefect_postgres:
+        restart: "always"
         image: "postgres:11"
         environment:
             POSTGRES_USER: ${POSTGRES_USER}
@@ -19,7 +17,6 @@ services:
             - prefect_postgres:/var/lib/postgresql/data
         networks:
             - prefect-server
-        restart: "always"
         healthcheck:
             test: pg_isready -q -d $${POSTGRES_DB} -U $${POSTGRES_USER} || exit 1
             interval: 10s
@@ -33,6 +30,7 @@ services:
             - "max_connections=150"
 
     prefect_hasura:
+        restart: "always"
         image: "hasura/graphql-engine:v1.3.3"
         ports:
             - "3000:3000"
@@ -45,7 +43,6 @@ services:
             HASURA_GRAPHQL_LOG_LEVEL: "warn"
         networks:
             - prefect-server
-        restart: "always"
         healthcheck:
             test: wget -O - http://hasura:3000/healthz &>/dev/null || exit 1
             interval: 10s
@@ -56,6 +53,7 @@ services:
             - prefect_postgres
 
     prefect_graphql:
+        restart: "always"
         image: "prefecthq/server:latest"
         ports:
             - "4201:4201"
@@ -67,7 +65,6 @@ services:
             PREFECT_SERVER__HASURA__HOST: prefect_hasura
         networks:
             - prefect-server
-        restart: "always"
         healthcheck:
             test: curl --fail --silent "http://prefect_graphql:4201/health" &> /dev/null || exit 1
             interval: 20s
@@ -78,6 +75,7 @@ services:
             - prefect_hasura
 
     prefect_towel:
+        restart: "always"
         image: "prefecthq/server:latest"
         command: "python src/prefect_server/services/towel/__main__.py"
         environment:
@@ -85,11 +83,11 @@ services:
             PREFECT_SERVER__HASURA__HOST: prefect_hasura
         networks:
             - prefect-server
-        restart: "always"
         depends_on:
             - prefect_graphql
 
     prefect_apollo:
+        restart: "always"
         image: "prefecthq/apollo:latest"
         command: bash -c "./post-start.sh && npm run serve"
         ports:
@@ -103,7 +101,6 @@ services:
             GRAPHQL_SERVICE_PORT: 4201
         networks:
             - prefect-server
-        restart: "always"
         healthcheck:
             test: curl --fail --silent "http://prefect_apollo:4200/.well-known/apollo/server-health" &> /dev/null || exit 1
             interval: 10s
@@ -114,6 +111,7 @@ services:
             - prefect_graphql
 
     prefect_ui:
+        restart: "always"
         image: "prefecthq/ui:2021-02-23"
         ports:
             - "8081:8080"
@@ -123,7 +121,6 @@ services:
             PREFECT_BACKEND: server
         networks:
             - prefect-server
-        restart: "always"
         healthcheck:
             test: curl --fail --silent --head "http://prefect_ui:8080/" &> /dev/null || exit 1
             interval: 30s
@@ -133,6 +130,7 @@ services:
             - prefect_apollo
 
     es01:
+        restart: always
         image: docker.elastic.co/elasticsearch/elasticsearch:7.12.0
         volumes:
             - "es01:/usr/share/elasticsearch/data"
@@ -175,6 +173,7 @@ services:
                 hard: 500000
 
     es02:
+        restart: always
         image: docker.elastic.co/elasticsearch/elasticsearch:7.12.0
         volumes:
             - "es02:/usr/share/elasticsearch/data"
@@ -207,6 +206,7 @@ services:
                 hard: 500000
 
     es03:
+        restart: always
         image: docker.elastic.co/elasticsearch/elasticsearch:7.12.0
         volumes:
             - "es03:/usr/share/elasticsearch/data"
@@ -240,6 +240,7 @@ services:
 
     kibana:
         image: docker.elastic.co/kibana/kibana:7.12.0
+        restart: always
         volumes:
             - type: bind
               source: ./kibana.yml
@@ -251,31 +252,9 @@ services:
         depends_on:
             - es01
 
-    enterprise_search:
-        image: docker.elastic.co/enterprise-search/enterprise-search:7.12.0
-        environment:
-            JAVA_OPTS: "-Xms512m -Xmx512m"
-            ENT_SEARCH_DEFAULT_PASSWORD: elasticelastic
-            ent_search.external_url: "https://localhost:3002"
-            ent_search.auth.source: elasticsearch-native # elasticsearch-based users
-            ent_search.ssl.enabled: "true"
-            ent_search.ssl.keystore.path: "/usr/share/elasticsearch/config/certificates/enterprise_search/enterprise_search.p12"
-            ent_search.ssl.keystore.password: changeme
-            elasticsearch.username: elastic
-            elasticsearch.password: ${ELASTICSEARCH_PWD}
-            elasticsearch.host: "https://es01:9200"
-            elasticsearch.ssl.enabled: "true"
-            elasticsearch.ssl.certificate_authority: "/usr/share/elasticsearch/config/certificates/ca/ca.crt"
-            allow_es_settings_modification: "true"
-            secret_management.encryption_keys: "[elasticelastic]"
-            telemetry.enabled: "false"
-        volumes:
-            - "./certs:/usr/share/elasticsearch/config/certificates:ro"
-        ports:
-            - "3002:3002"
-
     # source : https://docs.min.io/docs/deploy-minio-on-docker-compose.html
     minio:
+        restart: always
         image: minio/minio:RELEASE.2021-04-06T23-11-00Z-24-g409125240
         command: server /data
         ports:

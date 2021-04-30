@@ -7,9 +7,12 @@ import clevercsv
 import traceback
 from tqdm import tqdm
 from prefect import Flow, Task, Client, task
-from minio import Minio
+from datetime import timedelta, datetime
+from prefect.schedules import IntervalSchedule
 from elasticsearch import Elasticsearch, helpers
 from geopy.geocoders import Nominatim
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.util.retry import Retry
 
 from mapping import mapping
 
@@ -25,6 +28,7 @@ ELASTIC_PWD = os.environ.get("ELASTIC_PWD")
 ELASTIC_ENDPOINT = os.environ.get("ELASTIC_ENDPOINT")
 
 csv_endpoint = "https://raw.githubusercontent.com/opencovid19-fr/data/master/dist/chiffres-cles.csv"
+index_name = "contamination_opencovid19_fr"
 project_name = f"pandemic-knowledge-opencovid19-fr"
 flow_name = project_name
 
@@ -34,11 +38,11 @@ columns_allowed = {
     "date": ["date"],
     "location": ["maille_nom"],
     "location_name": ["maille_nom"],
-    "cases": ["cas_confirmes"],
-    "deaths": ["new_deaths"],
+    "confirmed": ["cas_confirmes"],
+    "deaths": ["deces"],
     "recovered": ["gueris"],
     "vaccinated": [],
-    "tested": [],
+    "tested": ["depistes"],
 }
 
 extra_locations = {"EL": "GR"}
@@ -74,28 +78,6 @@ def format_location(lookup_table, location_name):
         return locations_cache[location_name]
     if location_name in lookup_table:
         return lookup_table[location_name]
-
-    logger.info(f"Guessing geolocation for {location_name}")
-    geolocator = Nominatim(user_agent="pandemic-knowledge")
-    location = geolocator.geocode(
-        extra_locations[location_name]
-        if location_name in extra_locations
-        else location_name,
-        addressdetails=True,
-    )
-
-    if location and location.raw:
-        logger.info(f"Found {location.latitude}, {location.longitude}")
-        if "address" in location.raw and "country_code" in location.raw["address"]:
-            locations_cache[location_name] = (
-                {"lat": location.latitude, "lon": location.longitude},
-                location.raw["address"]["country_code"].upper(),
-            )
-            return locations_cache[location_name]
-    locations_cache[location_name] = None
-    logger.error(
-        f"Failed to locate (no country code and/or coordinates) for {location}"
-    )
     return None
 
 
@@ -121,27 +103,27 @@ def format_row(lookup_table, row, headers, filename):
         lookup_table, pick_nonempty_cell(row, headers, columns_allowed["location"])
     )
     location_name = pick_nonempty_cell(row, headers, columns_allowed["location_name"])
-    nb_cases = pick_nonempty_cell(row, headers, columns_allowed["cases"])
+    nb_confirmed = pick_nonempty_cell(row, headers, columns_allowed["confirmed"])
     nb_deaths = pick_nonempty_cell(row, headers, columns_allowed["deaths"])
     nb_recovered = pick_nonempty_cell(row, headers, columns_allowed["recovered"])
     nb_vaccinated = pick_nonempty_cell(row, headers, columns_allowed["vaccinated"])
     nb_tested = pick_nonempty_cell(row, headers, columns_allowed["tested"])
-    if location and date_start and nb_cases:
+    if date_start != None:
         return {
             "date_start": date_start,
             "date_end": date_end,
-            "location": location[0],
+            "location": location[0] if location else None,
             "location_name": location_name,
-            "cases": int(float(nb_cases)) if nb_cases else 0,
-            "confirmed": int(float(nb_cases)) if nb_cases else 0,
+            "confirmed": int(float(nb_confirmed)) if nb_confirmed else 0,
             "deaths": int(float(nb_deaths)) if nb_deaths else 0,
             "recovered": int(float(nb_recovered)) if nb_recovered else 0,
             "vaccinated": int(float(nb_vaccinated)) if nb_vaccinated else 0,
             "tested": int(float(nb_tested)) if nb_tested else 0,
             "filename": filename,
-            "iso_code2": location[1] if len(location) else None,
-            "iso_region2": f"FR-{row[2][4:]}"
+            "iso_code2": location[1] if location else None,
+            "iso_region2": str(row[2]).replace("DEP", "FR"),
         }
+    logger.warning(f"format_row(): Invalid row : {row}")
     return None
 
 
@@ -189,7 +171,7 @@ def process_file(lookup_table, index_name, file_path):
                 inject_rows_to_es(to_inject, index_name)
                 to_inject = []
         else:
-            logger.info("process_file(): Invalid row")
+            logger.warning("process_file(): Invalid row")
     if len(to_inject) > 0:
         inject_rows_to_es(to_inject, index_name)
 
@@ -197,26 +179,25 @@ def process_file(lookup_table, index_name, file_path):
 class ParseFiles(Task):
     def run(self, lookup_table, index_name, http_csv_uris: list):
         for file_uri in tqdm(http_csv_uris):
-            try:
-                logger.info(f"Processing file {file_uri}...")
-                file_path = f"/tmp/{uuid.uuid4()}"
-                r = requests.get(file_uri)
-                with open(file_path, 'wb') as f:
-                    f.write(r.content)
-                process_file(lookup_table, index_name, file_path)
-            except Exception as e:
-                logger.error(traceback.format_exc())
-                logger.error(e)
-                logger.error(f"Can't process file {file_uri}")
+            logger.info(f"Processing file {file_uri}...")
+            file_path = f"/tmp/{uuid.uuid4()}"
+            session = requests.Session()
+            retry = Retry(connect=3, backoff_factor=0.5)
+            adapter = HTTPAdapter(max_retries=retry)
+            session.mount("http://", adapter)
+            session.mount("https://", adapter)
+            r = session.get(file_uri, allow_redirects=True)
+            with open(file_path, "wb") as f:
+                f.write(r.content)
+            process_file(lookup_table, index_name, file_path)
 
 
 class GenerateEsMapping(Task):
-    def run(self) -> str:
+    def run(self, index_name) -> str:
         """
         Returns:
             str: index_name
         """
-        index_name = f"{project_name.replace('-', '_')}"
         es_inst = get_es_instance()
         logger.info("Generating mapping for index {}".format(index_name))
         es_inst.indices.delete(index=index_name, ignore=[400, 404])
@@ -260,19 +241,23 @@ def read_lookup_table(lookup_file_path: str):
     return lookup
 
 
+lookup_table = read_lookup_table("/usr/app/UID_ISO_FIPS_LookUp_Table.csv")
+
+schedule = IntervalSchedule(
+    start_date=datetime.utcnow() + timedelta(seconds=1), interval=timedelta(hours=24)
+)
+with Flow(flow_name, schedule=schedule) as flow:
+    es_mapping_task = GenerateEsMapping()
+    index_name = es_mapping_task(index_name)
+
+    parse_files_task = ParseFiles()
+    parse_files_task(
+        lookup_table=lookup_table,
+        index_name=index_name,
+        http_csv_uris=[csv_endpoint],
+    )
+
 if __name__ == "__main__":
-    lookup_table = read_lookup_table("/usr/app/UID_ISO_FIPS_LookUp_Table.csv")
-
-    with Flow(flow_name) as flow:
-        es_mapping_task = GenerateEsMapping()
-        index_name = es_mapping_task()
-
-        parse_files_task = ParseFiles()
-        parse_files_task(
-            lookup_table=lookup_table,
-            index_name=index_name,
-            http_csv_uris=[csv_endpoint],
-        )
 
     try:
         client = Client()
@@ -280,5 +265,6 @@ if __name__ == "__main__":
     except prefect.utilities.exceptions.ClientError as e:
         logger.info("Project already exists")
 
-    flow.register(project_name=project_name, labels=["development"])
-    flow.run()
+    flow.register(
+        project_name=project_name, labels=["development"], add_default_labels=False
+    )

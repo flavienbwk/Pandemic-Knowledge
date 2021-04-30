@@ -1,16 +1,16 @@
 import os
 import dateparser
 import uuid
+import requests
 import prefect
 import clevercsv
-import traceback
 from tqdm import tqdm
 from prefect import Flow, Task, Client, task
 from datetime import timedelta, datetime
 from prefect.schedules import IntervalSchedule
-from minio import Minio
 from elasticsearch import Elasticsearch, helpers
-from geopy.geocoders import Nominatim
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.util.retry import Retry
 
 from mapping import mapping
 
@@ -25,22 +25,22 @@ ELASTIC_USER = os.environ.get("ELASTIC_USER")
 ELASTIC_PWD = os.environ.get("ELASTIC_PWD")
 ELASTIC_ENDPOINT = os.environ.get("ELASTIC_ENDPOINT")
 
-bucket_name = "contamination-owid"
-project_name = f"pandemic-knowledge-{bucket_name}"
-index_name = f"{bucket_name.replace('-', '_')}"
+csv_endpoint = "https://www.data.gouv.fr/en/datasets/r/406c6a23-e283-4300-9484-54e78c8ae675"
+project_name = f"pandemic-knowledge-santepublic-tests"
+index_name = "contamination_santepublique_vir_tests_fr"
 flow_name = project_name
 
 logger = prefect.context.get("logger")
 
 columns_allowed = {
-    "date": ["date"],
-    "location": ["location"],
-    "location_name": ["location"],
-    "confirmed": ["new_cases"],
-    "deaths": ["new_deaths"],
+    "date": ["jour"],
+    "location": ["dep"],
+    "location_name": ["dep"],
+    "confirmed": ["P"],
+    "deaths": [],
     "recovered": [],
-    "vaccinated": ["new_vaccinations"],
-    "tested": ["new_tests"],
+    "vaccinated": [],
+    "tested": ["T"],
 }
 
 extra_locations = {"EL": "GR"}
@@ -76,28 +76,6 @@ def format_location(lookup_table, location_name):
         return locations_cache[location_name]
     if location_name in lookup_table:
         return lookup_table[location_name]
-
-    logger.info(f"Guessing geolocation for {location_name}")
-    geolocator = Nominatim(user_agent="pandemic-knowledge")
-    location = geolocator.geocode(
-        extra_locations[location_name]
-        if location_name in extra_locations
-        else location_name,
-        addressdetails=True,
-    )
-
-    if location and location.raw:
-        logger.info(f"Found {location.latitude}, {location.longitude}")
-        if "address" in location.raw and "country_code" in location.raw["address"]:
-            locations_cache[location_name] = (
-                {"lat": location.latitude, "lon": location.longitude},
-                location.raw["address"]["country_code"].upper(),
-            )
-            return locations_cache[location_name]
-    locations_cache[location_name] = None
-    logger.error(
-        f"Failed to locate (no country code and/or coordinates) for {location}"
-    )
     return None
 
 
@@ -128,11 +106,11 @@ def format_row(lookup_table, row, headers, filename):
     nb_recovered = pick_nonempty_cell(row, headers, columns_allowed["recovered"])
     nb_vaccinated = pick_nonempty_cell(row, headers, columns_allowed["vaccinated"])
     nb_tested = pick_nonempty_cell(row, headers, columns_allowed["tested"])
-    if location != None and date_start != None and nb_confirmed != None:
+    if date_start != None:
         return {
             "date_start": date_start,
             "date_end": date_end,
-            "location": location[0],
+            "location": location[0] if location else None,
             "location_name": location_name,
             "confirmed": int(float(nb_confirmed)) if nb_confirmed else 0,
             "deaths": int(float(nb_deaths)) if nb_deaths else 0,
@@ -140,8 +118,10 @@ def format_row(lookup_table, row, headers, filename):
             "vaccinated": int(float(nb_vaccinated)) if nb_vaccinated else 0,
             "tested": int(float(nb_tested)) if nb_tested else 0,
             "filename": filename,
-            "iso_code2": location[1] if len(location) else None,
+            "iso_code2": location[1] if location else None,
+            "iso_region2": f"FR-{location_name}",
         }
+    logger.warning(f"format_row(): Invalid row : {row}")
     return None
 
 
@@ -156,11 +136,9 @@ def inject_rows_to_es(rows, index_name):
     helpers.bulk(es_inst, actions)
 
 
-def parse_file(lookup_table, minio_client, bucket_name, object_name):
-    csv_file_path = "/tmp/" + str(uuid.uuid4())
-    minio_client.fget_object(bucket_name, object_name, csv_file_path)
-    with open(csv_file_path, "r", newline="") as fp:
-        char_read = 10000 if os.path.getsize(csv_file_path) > 10000 else None
+def parse_file(lookup_table, file_path):
+    with open(file_path, "r", newline="") as fp:
+        char_read = 10000 if os.path.getsize(file_path) > 10000 else None
 
         try:
             dialect = clevercsv.Sniffer().sniff(fp.read(char_read), verbose=True)
@@ -175,57 +153,39 @@ def parse_file(lookup_table, minio_client, bucket_name, object_name):
         for i, header in enumerate(headers_list):
             headers[header] = i
         for row in tqdm(reader, unit="entry"):
-            yield format_row(lookup_table, row, headers, object_name)
+            yield format_row(lookup_table, row, headers, file_path)
     return []
 
 
-def process_file(lookup_table, index_name, bucket_name, object_name):
-    minio_client = Minio(
-        MINIO_ENDPOINT,
-        access_key=MINIO_ACCESS_KEY,
-        secret_key=MINIO_SECRET_KEY,
-        secure=MINIO_SCHEME == "https",
-    )
+def process_file(lookup_table, index_name, file_path):
     to_inject = []
-    logger.info(f"Processing {object_name}...")
-    for row in parse_file(lookup_table, minio_client, bucket_name, object_name):
+    logger.info(f"process_file(): Processing {file_path}...")
+    for row in parse_file(lookup_table, file_path):
         if row is not None:
             to_inject.append(row)
             if len(to_inject) >= MAX_ES_ROW_INJECT:
                 inject_rows_to_es(to_inject, index_name)
                 to_inject = []
         else:
-            logger.info("Invalid row")
+            logger.warning("process_file(): Invalid row")
     if len(to_inject) > 0:
         inject_rows_to_es(to_inject, index_name)
 
 
-def get_files(bucket_name):
-    minio_client = Minio(
-        MINIO_ENDPOINT,
-        access_key=MINIO_ACCESS_KEY,
-        secret_key=MINIO_SECRET_KEY,
-        secure=MINIO_SCHEME == "https",
-    )
-    logger.info("Parse file for bucket {}".format(bucket_name))
-    if not minio_client.bucket_exists(bucket_name):
-        logger.error("Bucket {} does not exists".format(bucket_name))
-        return
-    return list(minio_client.list_objects(bucket_name))
-
-
 class ParseFiles(Task):
-    def run(self, lookup_table, index_name):
-        logger.info(lookup_table)
-        for file in tqdm(get_files(bucket_name=bucket_name)):
-            object_name = file.object_name
-            try:
-                logger.info(f"Processing file {object_name}...")
-                process_file(lookup_table, index_name, bucket_name, object_name)
-            except Exception as e:
-                logger.error(traceback.format_exc())
-                logger.error(e)
-                logger.error(f"Can't process file {object_name}")
+    def run(self, lookup_table, index_name, http_csv_uris: list):
+        for file_uri in tqdm(http_csv_uris):
+            logger.info(f"Processing file {file_uri}...")
+            file_path = f"/tmp/{uuid.uuid4()}"
+            session = requests.Session()
+            retry = Retry(connect=3, backoff_factor=0.5)
+            adapter = HTTPAdapter(max_retries=retry)
+            session.mount("http://", adapter)
+            session.mount("https://", adapter)
+            r = session.get(file_uri, allow_redirects=True)
+            with open(file_path, "wb") as f:
+                f.write(r.content)
+            process_file(lookup_table, index_name, file_path)
 
 
 class GenerateEsMapping(Task):
@@ -287,7 +247,11 @@ with Flow(flow_name, schedule=schedule) as flow:
     index_name = es_mapping_task(index_name)
 
     parse_files_task = ParseFiles()
-    parse_files_task(lookup_table=lookup_table, index_name=index_name)
+    parse_files_task(
+        lookup_table=lookup_table,
+        index_name=index_name,
+        http_csv_uris=[csv_endpoint],
+    )
 
 if __name__ == "__main__":
 

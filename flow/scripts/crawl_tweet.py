@@ -16,6 +16,7 @@ import pandas
 
 index = "tweets"
 name = "pandemic-knowledge-crawl-tweets"
+tweet_limit = 100
 
 MAX_ES_ROW_INJECT = int(os.environ.get("MAX_ES_ROW_INJECT", 1000))
 ELASTIC_SCHEME = os.environ.get("ELASTIC_SCHEME")
@@ -69,7 +70,7 @@ class GetTweets(Task):
         limit = d.strftime("%y-%m-%d")
         to_inject = []
         for i,tweet in enumerate(sntwitter.TwitterSearchScraper("covid since:" + limit).get_items()):
-            if i>300:
+            if i > tweet_limit:
                 break
             to_inject.append({
                 "date": tweet.date,

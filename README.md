@@ -15,7 +15,7 @@ A fully-featured multi-source data pipeline for continuously extracting knowledg
 - Contamination figures
 - Vaccination figures
 - Death figures
-- COVID-19-related news (Google News)
+- COVID-19-related news (Google News, Twitter)
 
 ## What you can achieve
 

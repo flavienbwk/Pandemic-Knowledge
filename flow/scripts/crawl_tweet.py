@@ -123,9 +123,8 @@ if __name__ == "__main__":
     except prefect.utilities.exceptions.ClientError as e:
         logger.info("Project already exists")
 
-    # flow.register(
-    #     project_name=project_name,
-    #     labels=["development"],
-    #     add_default_labels=False,
-    # )
-    flow.run()
+    flow.register(
+        project_name=project_name,
+        labels=["development"],
+        add_default_labels=False,
+    )

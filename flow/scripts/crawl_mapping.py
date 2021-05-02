@@ -11,11 +11,11 @@ mapping = {
             "img": {"type": "text"},
             "source": {
                 "properties": {
-                    "crawler": {"type": "string"},
-                    "website": {"type": "string"},
-                    "author": {"type": "string"},
-                    "url": {"type": "string"},
-                    "tweet": {"id": {"type": "string"}},
+                    "crawler": {"type": "text"},
+                    "website": {"type": "text"},
+                    "author": {"type": "text"},
+                    "url": {"type": "text"},
+                    "tweet": {"properties": {"id": {"type": "text"}}},
                 }
             },
             "lang": {"type": "text", "fields": {"keyword": {"type": "keyword"}}},
